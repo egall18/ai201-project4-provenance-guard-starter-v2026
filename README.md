@@ -235,15 +235,24 @@ happens to the second-language paragraph from Milestone 1 (0.890 / 0.356).
 
 | Label | Score range | The exact text a reader sees |
 |---|---|---|
-| high-confidence human |  |  |
-| unsure |  |  |
-| high-confidence AI |  |  |
+| high-confidence human | 0.00 up to and including 0.35 | We think this was probably written by a person. |
+| unsure | above 0.35 and below 0.65 | We couldn't tell whether this was written by a person or with AI help, so we're not making a call either way. If you'd like a person to look at it, you can ask for a review. |
+| high-confidence AI | 0.65 up to 1.00 | This looks like it was likely written with AI. Our checks can be wrong. If you wrote this yourself, you can ask a person to review it. |
 
 **Why I worded the "unsure" one this way:**
 <!-- It's the hardest of the three. It has to admit uncertainty without
      sounding like an accusation, because the person reading it may well have
      written every word themselves. -->
 
+The person most likely to see this label is a plain or second-language writer
+who wrote every word — my agreement rule sends them here on purpose instead of
+to "AI". So I wrote it for them: no guess about them, no score, nothing they
+have to defend, and a way to get a person to look if they want one.
+
+My first version ended "This is not an accusation." Reading it back as the
+writer, that line made it sound like one — nobody says that unless they're
+thinking it — and it didn't tell them what they could do. I swapped it for the
+review option.
 
 
 ---
@@ -268,58 +277,109 @@ $ curl -X POST http://127.0.0.1:5000/submit \
 
 ```json
 {
-  "confidence": 0.8665,
-  "content_id": "a9d986af-74dd-4cf4-8381-883ed77ddff5",
-  "guess": "unsure",
-  "label": "PLACEHOLDER — labels arrive in Milestone 5.",
+  "confidence": 0.8926,
+  "content_id": "1c53a5e0-0b5d-49a8-863c-06a39c5508a3",
+  "guess": "ai",
+  "label": "This looks like it was likely written with AI. Our checks can be wrong. If you wrote this yourself, you can ask a person to review it.",
   "model_score": 0.8665,
   "status": "decided",
-  "style_score": null
+  "style_score": 0.9187
 }
 ```
-
-<!-- Milestone 3 run: one signal only, so style_score is null and confidence
-     is just the model score. Replaced with a full run in Milestone 5. -->
 
 **An appeal**
 
 ```bash
 $ curl -X POST http://127.0.0.1:5000/appeal \
   -H "Content-Type: application/json" \
-  -d '{"content_id": "...", "reasoning": "..."}'
-```
-
-```json
-
-```
-
-**What the log shows afterwards**
-
-```bash
-$ curl "http://127.0.0.1:5000/log?limit=3"
+  -d '{"content_id": "1c53a5e0-0b5d-49a8-863c-06a39c5508a3", "reasoning": "I wrote this myself for my ethics class. I tend to write formally when it is for school."}'
 ```
 
 ```json
 {
-  "count": 1,
+  "content_id": "1c53a5e0-0b5d-49a8-863c-06a39c5508a3",
+  "message": "Thanks — your appeal is in. A person will review this piece.",
+  "status": "under_review"
+}
+```
+
+**What the log shows afterwards**
+
+<!-- limit=6 rather than 3 so the original decision is in view: the run also
+     produced a human and an unsure submission, and two refused appeals. -->
+
+```bash
+$ curl "http://127.0.0.1:5000/log?limit=6"
+```
+
+```json
+{
+  "count": 6,
   "entries": [
     {
-      "combined_score": 0.8665,
-      "content_id": "a9d986af-74dd-4cf4-8381-883ed77ddff5",
+      "combined_score": 0.8926,
+      "content_id": "1c53a5e0-0b5d-49a8-863c-06a39c5508a3",
       "creator_id": "erik",
-      "guess": "unsure",
-      "label": "PLACEHOLDER — labels arrive in Milestone 5.",
+      "guess": "ai",
+      "label": "This looks like it was likely written with AI. Our checks can be wrong. If you wrote this yourself, you can ask a person to review it.",
       "model_score": 0.8665,
       "status": "decided",
-      "style_score": null,
-      "timestamp": "2026-10-29T00:48:39+00:00"
+      "style_score": 0.9187,
+      "timestamp": "2026-10-29T01:05:58+00:00"
+    },
+    {
+      "combined_score": 0.326,
+      "content_id": "a72be3ff-dfcc-4dc8-b01d-45cf2e5cf4b4",
+      "creator_id": "erik",
+      "guess": "human",
+      "label": "We think this was probably written by a person.",
+      "model_score": 0.3943,
+      "status": "decided",
+      "style_score": 0.2578,
+      "timestamp": "2026-10-29T01:05:58+00:00"
+    },
+    {
+      "combined_score": 0.64,
+      "content_id": "5f934ed6-09a1-4221-872e-81db8f6568c0",
+      "creator_id": "erik",
+      "guess": "unsure",
+      "label": "We couldn't tell whether this was written by a person or with AI help, so we're not making a call either way. If you'd like a person to look at it, you can ask for a review.",
+      "model_score": 0.884,
+      "status": "decided",
+      "style_score": 0.4172,
+      "timestamp": "2026-10-29T01:05:58+00:00"
+    },
+    {
+      "content_id": "1c53a5e0-0b5d-49a8-863c-06a39c5508a3",
+      "creator_id": "erik",
+      "event": "appeal",
+      "reasoning": "I wrote this myself for my ethics class. I tend to write formally when it is for school.",
+      "status": "under_review",
+      "timestamp": "2026-10-29T01:05:58+00:00"
+    },
+    {
+      "creator_id": "unknown",
+      "event": "rejected",
+      "reason": "appeal_not_found",
+      "requested_content_id": "not-a-real-id",
+      "status": "rejected",
+      "timestamp": "2026-10-29T01:05:58+00:00"
+    },
+    {
+      "creator_id": "unknown",
+      "event": "rejected",
+      "reason": "appeal_missing_reasoning",
+      "status": "rejected",
+      "timestamp": "2026-10-29T01:05:58+00:00"
     }
   ]
 }
 ```
 
-<!-- Milestone 3: the decision entry for the submission above, as /log returned
-     it. Replaced in Milestone 5 with the submission + appeal pair. -->
+The original decision is untouched; the appeal sits after it with
+`status: "under_review"`. A second appeal on the same id returned `409`, an
+appeal on `not-a-real-id` returned `404`, and one with no reasoning returned
+`400` — the last two are the rejection entries at the bottom.
 
 **A bad input, refused and logged**
 
