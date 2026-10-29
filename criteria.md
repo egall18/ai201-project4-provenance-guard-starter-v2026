@@ -42,63 +42,73 @@ Two things worth knowing before you pick numbers:
   a **miss**.
 
 ---
-## 1.
+## 1. At most 2 of 10 pieces I wrote myself are labelled high-confidence AI
 
-<!-- Your criterion. It must name a number. -->
+I submit 10 pieces of my own writing. At most 2 come back with
+`guess: "ai"`. An `unsure` label does not count against this — only the
+high-confidence AI label does. This must hold in all three trials.
 
-
-
-**Why this target:**
-
-
-
----
-
-## 2.
-
-<!-- Your criterion. -->
-
-
-
-**Why this target:**
-
-
+**Why this target:** On a writing site, wrongly calling someone's real work AI
+costs them far more than letting some AI text through. My first number was 3
+of 10, but that meant almost a third of honest writers accused, which I
+couldn't defend after reading what one of them would write to me.
 
 ---
 
-## 3.
+## 2. Every bad input gets a 400 and a log entry — none crash the service
 
-<!-- Your criterion. -->
+Five malformed submissions: `text` missing, `text` blank (`""` or only
+spaces), `text` under 5 words, `text` over 20,000 characters, and `text` that
+isn't a string (`null`). All 5 of 5 return `400` with an `error` and a
+`message`, none return `500`, and each one adds an entry with
+`status: "rejected"` to the audit log. This must hold in all three trials.
 
-
-
-**Why this target:**
-
-
-
----
-
-## 4.
-
-<!-- Your criterion. -->
-
-
-
-**Why this target:**
-
-
+**Why this target:** A 500 tells a real writer the site is broken instead of
+telling them what to fix. And a rejected request that leaves no log entry
+hides anyone probing the system with weird inputs — I'd never see it in
+unit 8. Both the writer and I need to see what happened.
 
 ---
 
-## 5.
+## 3. Every appeal is recorded, and appeals on unknown IDs are refused
 
-<!-- Your criterion. -->
+10 appeals on real `content_id`s: all 10 of 10 return `200` with
+`status: "under_review"`, and each adds an `appeal` entry to the audit log
+for that `content_id`. 3 appeals on made-up `content_id`s: all 3 of 3 return
+`404` and add no appeal entry. This must hold in all three trials.
 
+**Why this target:** The appeal is the only thing a wrongly flagged writer can
+do, so it has to work every single time — one silent failure leaves that
+person with no recourse at all. And a mistyped ID has to fail loudly, or the
+writer thinks they appealed when nothing happened.
 
+---
 
-**Why this target:**
+## 4. Clearly-AI text scores at least 0.30 higher than clearly-human text
 
+Five texts I'm confident are AI-generated and five I'm confident are
+human-written. The average `confidence` of the AI five minus the average of
+the human five is at least 0.30. This must hold in all three trials.
 
+**Why this target:** If clearly-AI and clearly-human text score close
+together, my signals aren't telling them apart and the labels are basically
+guesses. 0.30 is also the width of my unsure band (0.35–0.65), so a smaller
+gap means clear cases could both land in "unsure".
+
+---
+
+## 5. Every submission after the first answers within 3 seconds
+
+After one warm-up submission (which loads the model — about 20 seconds on my
+laptop), every `/submit` in the run returns within 3 seconds, measured from
+request sent to response received. This must hold in all three trials.
+
+**Why this target:** The model runs on my laptop's CPU, so timing moves with
+text length and whatever else the machine is doing. I measured about 0.7 s
+per submission at the longest text the model reads, and 3 seconds leaves room
+for that variance while still being short enough that a writer won't give up
+waiting. A model being reloaded on every request would take 20+ seconds and
+miss this immediately.
 
 ---
 
