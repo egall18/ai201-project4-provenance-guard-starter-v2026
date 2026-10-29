@@ -162,17 +162,50 @@ lumpier — a three-word sentence next to a forty-word one.
 
 **What it can't see:** Meaning. Anything that changes the shape without
 changing the substance moves it: adding typos, chopping sentences up, pasting
-in a quotation. That's cheap to do on purpose. Vocabulary variety also falls
-as text gets longer, so length alone can look like a signal.
+in a quotation. That's cheap to do on purpose — my lightly-edited AI sample
+(contractions, one short "Honestly?") already has more spread than the human
+bike story. It also can't judge very short text: in a single short sentence
+no word repeats, so vocabulary variety maxes out and an 8-word sentence scores
+0.83, AI-like. I use a 50-word moving average to stop length alone looking
+like a signal, but under 50 words there's nothing to average over.
 
 ### The combining rule
 
 <!-- Write the rule in words, then give the numbers. What happens when the two
      signals disagree? -->
 
-**The rule:**
+**The rule:** Average the two signals equally. But an "AI" label needs both
+signals to agree: if either one is below 0.5, the score is capped just under
+the AI line, so the most it can say is "unsure". One signal on its own can
+never accuse anyone. It's one-sided on purpose — disagreement can still end
+in a confident "human".
 
-**The numbers:**
+**The numbers:** `WEIGHT_MODEL_SIGNAL = 0.5`, `WEIGHT_STYLE_SIGNAL = 0.5`,
+`AGREEMENT_FLOOR = 0.5`, cap = `AI_THRESHOLD - 0.01` = 0.64. All in
+`config.py`.
+
+Inside signal two, each measure is mapped onto 0–1 and the three are averaged:
+
+| Measure | Maps to 0.0 (human) | Maps to 1.0 (AI) |
+|---|---|---|
+| sentence-length spread (stdev ÷ mean) | 0.65 or more | 0.15 or less |
+| type-token ratio (50-word moving average) | 0.75 or less | 0.95 or more |
+| punctuation per word (everything but full stops) | 0.02 or less | 0.10 or more |
+
+I picked the direction of each from data, not assumption. Vocabulary variety
+came out **backwards** from what I expected: the AI texts scored 0.86–0.92,
+the human ones 0.78–0.83. Generated text reaches for varied, formal words;
+plain human writers repeat common ones.
+
+**Calibration run** (both signals printed separately, as the brief asks):
+
+| Input | model | style | combined |
+|---|---|---|---|
+| clearly AI | 0.867 | 0.919 | 0.893 |
+| clearly human | 0.394 | 0.258 | 0.326 |
+| formal human (Lincoln, 2nd Inaugural) | 0.600 | 0.353 | 0.477 |
+| lightly-edited AI | 0.505 | 0.551 | 0.528 |
+| plain human | 0.884 | 0.417 | 0.640 (capped) |
 
 **Where it lives:** `scoring.py::combine_signals`
 
@@ -180,6 +213,14 @@ as text gets longer, so length alone can look like a signal.
      somewhere else, say where. -->
 
 **A case where my two signals split, and what my rule does with it:**
+
+A plain, human-style paragraph about a weekend hike — short sentences, common
+words. Signal one scored it **0.884** (very AI-like: it's predictable). Signal
+two scored it **0.417** (human-leaning: low punctuation, repeated everyday
+words). A plain average gives **0.651**, which is just over the 0.65 AI line —
+a false accusation. Under my rule, the style score is below 0.5, so the score
+is capped at **0.64** and the writer gets "unsure" instead. The same thing
+happens to the second-language paragraph from Milestone 1 (0.890 / 0.356).
 
 
 

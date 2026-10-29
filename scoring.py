@@ -51,12 +51,25 @@ def combine_signals(model_score: float, style_score: float) -> float:
 
     The weights in config.py are placeholders. Change them, or ignore them and
     write a different rule.
+
+    My rule — the agreement rule:
+
+      1. Weighted average, 50/50 (WEIGHT_MODEL_SIGNAL, WEIGHT_STYLE_SIGNAL).
+      2. If EITHER signal is below AGREEMENT_FLOOR (0.5), the score is capped
+         at AI_THRESHOLD - 0.01, so it can be "unsure" at most, never "AI".
+
+    It's one-sided on purpose. Disagreement can still produce a confident
+    "human", but an accusation needs both signals to agree. Plain human
+    writing scored model 0.884 / style 0.417 — a plain average put it at
+    0.651, over the AI line. Under this rule it lands at 0.64, "unsure".
     """
-    # TODO: replace this
-    return (
+    score = (
         config.WEIGHT_MODEL_SIGNAL * model_score
         + config.WEIGHT_STYLE_SIGNAL * style_score
     )
+    if min(model_score, style_score) < config.AGREEMENT_FLOOR:
+        score = min(score, config.AI_THRESHOLD - 0.01)
+    return round(score, 4)
 
 
 def score_to_label(score: float) -> tuple[str, str]:

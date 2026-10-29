@@ -63,6 +63,13 @@ DETECTOR_MAX_TOKENS = 400
 WEIGHT_MODEL_SIGNAL = 0.5
 WEIGHT_STYLE_SIGNAL = 0.5
 
+# The agreement rule: a combined score can only reach the AI label if BOTH
+# signals are at least this high. If either one is below it, the score is
+# capped just under AI_THRESHOLD, so it lands in "unsure". One signal alone
+# never accuses anyone — that's the plain-writer case from Milestone 1, where
+# the model signal reads 0.88 on real human writing.
+AGREEMENT_FLOOR = 0.5
+
 
 # ─── Thresholds (Milestone 5) ────────────────────────────────────────────────
 # Where one label becomes another. Scores run 0.0 (confidently human) to 1.0
