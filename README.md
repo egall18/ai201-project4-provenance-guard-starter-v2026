@@ -401,17 +401,34 @@ $ curl -X POST http://127.0.0.1:5000/submit \
 
 ## How I Used AI
 
-**Moment 1**
+**Moment 1 — building the style signal (Milestone 4)**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I had Claude build the three measures in
+  `stylometry.py` and run both signals over a set of calibration texts before
+  deciding how to scale or combine anything.
+- *What came back:* The measures, plus a table that went against the
+  starter's hint: vocabulary variety was *higher* for the AI texts
+  (0.86–0.92) than the human ones (0.78–0.83). It also showed that a plain
+  50/50 average put a plain human paragraph (model 0.884, style 0.417) at
+  0.651 — just over my AI line. Claude also pointed out that most of the
+  "human" calibration texts were ones it had written imitating human
+  writing; only the Lincoln passage was really human.
+- *What I changed:* I flipped the direction of the vocabulary measure to
+  follow the data, and out of three combining rules it laid out I picked the
+  agreement rule, so one signal alone can never put someone in the AI label.
+  I'm treating the calibration as provisional until I've run my own writing
+  through it for criterion 1.
 
-**Moment 2**
+**Moment 2 — testing my labels (Milestone 5)**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I picked my three labels, then asked Claude to read each
+  one as the writer — what it says about me and what I'd do next — without
+  rewriting them.
+- *What came back:* For my "unsure" label it said the line "This is not an
+  accusation" made it sound like one, and that neither "unsure" nor "AI" told
+  the writer how to get a review.
+- *What I changed:* I cut "This is not an accusation" and ended the unsure
+  label with the option to ask for a person to review it.
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
