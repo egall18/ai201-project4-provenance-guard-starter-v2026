@@ -39,7 +39,85 @@
 <!-- The path a submission takes, from arriving to the label a reader sees.
      Six or seven steps — this is the trace you wrote in Milestone 1. -->
 
+1. **The request arrives.** A writer sends `POST /submit` with
+   `{"text": ..., "creator_id": ...}`. Flask hands the JSON to
+   `app.py::submit`.
+2. **The route checks it.** Missing, blank, too-short (under 5 words) or
+   too-long (over 20,000 characters) text is refused with a `400` and logged
+   as a rejection. Anything that passes gets a fresh `content_id` (a uuid).
+3. **Signal one — `detector.model_signal`.** GPT-2, running locally, reads the
+   first ~400 tokens and measures perplexity: how predictable the words are.
+   That becomes `model_score`, 0–1, higher = more AI-like.
+4. **Signal two — `stylometry.style_signal`.** Measures the shape of the text
+   — sentence-length spread, vocabulary variety, punctuation — and turns it
+   into `style_score`, 0–1, higher = more AI-like.
+5. **`scoring.combine_signals`** merges the two into one score, returned as
+   `confidence`.
+6. **`scoring.score_to_label`** compares that score to the thresholds and
+   returns a `guess` (`human` / `unsure` / `ai`) and the sentence the reader
+   actually sees.
+7. **`audit.log_decision`** writes all nine fields to `logs/audit.jsonl` with
+   `status: "decided"`, and the response goes back to the writer — including
+   the `content_id` they need if they want to appeal.
 
+If the writer disagrees, `POST /appeal` with that `content_id` appends an
+appeal to the log and moves the item to `under_review`.
+
+### The false positive I designed around
+
+A writer working in their second language submits a plain paragraph they
+wrote themselves — short sentences, common words. I ran one like it through
+signal one: perplexity **12.1**, `model_score` **0.890**. The detector's own
+AI sample scored **0.886**. Signal one cannot tell them apart.
+
+If their sentences are also fairly even, signal two leans AI too (say 0.7),
+and a 50/50 average lands around 0.80 — over the 0.65 line, so they're told
+their work looks AI-written. Their only recourse is `/appeal` with their
+`content_id`, which moves the item to `under_review` for a person to look at.
+
+What that means for scoring: **one signal at 0.89 should not be enough to
+reach "AI" on its own.** That's the case Milestone 4's weights and Milestone
+5's thresholds have to handle.
+
+### The two endpoints
+
+**`POST /submit`**
+
+| In | Type | Rule |
+|---|---|---|
+| `text` | string | required; at least 5 words and at most 20,000 characters after trimming |
+| `creator_id` | string | required; not blank |
+
+| Out (`200`) | Type | Meaning |
+|---|---|---|
+| `content_id` | string | uuid for this submission — needed to appeal |
+| `guess` | string | `"human"`, `"unsure"` or `"ai"` |
+| `confidence` | float | the combined score: 0.0 = confidently human, 1.0 = confidently AI |
+| `label` | string | the sentence shown to the writer |
+| `model_score` | float | signal one, 0–1, higher = more AI-like |
+| `style_score` | float | signal two, 0–1, higher = more AI-like |
+| `status` | string | `"decided"` |
+
+Errors: `400 {"error": "invalid_input", "message": ...}` for bad input;
+`503 {"error": "detector_unavailable", ...}` if the model can't load;
+`429` once rate limiting is on (unit 8).
+
+**`POST /appeal`**
+
+| In | Type | Rule |
+|---|---|---|
+| `content_id` | string | required; must match a submission in the log |
+| `reasoning` | string | required; not blank |
+
+| Out (`200`) | Type | Meaning |
+|---|---|---|
+| `content_id` | string | the item appealed |
+| `status` | string | `"under_review"` |
+| `message` | string | confirmation to the writer |
+
+Errors: `400` for a missing or blank field; `404 {"error": "not_found"}` for
+an unknown `content_id`; `409 {"error": "already_under_review"}` if that item
+has already been appealed.
 
 ---
 
@@ -53,19 +131,39 @@
 
 ### Signal one — the model signal
 
-**What it measures:**
+**What it measures:** How predictable the text is to a language model. GPT-2
+runs locally and computes perplexity over the first ~400 tokens; low
+perplexity means "I could have guessed this". `detector.model_signal` squashes
+that onto 0–1, higher = more AI-like.
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** A language model
+writes by repeatedly picking a likely next word, so its output tends to be
+text a model finds easy to predict. Human writing wanders more — odd word
+choices, abrupt turns, the specific instead of the typical.
 
-**What it can't see:**
+**What it can't see:** Authorship. It measures predictability, and plenty of
+people write predictably: someone in their second language sticking to words
+they're sure of, a younger writer, anyone writing plainly on purpose. My plain
+human test paragraph scored 0.890, against 0.886 for an AI sample. It fails
+the other way too — ornate prose full of rare words reads as human (my ornate
+sample scored 0.229), so AI text prompted to use unusual vocabulary slips
+through. And it only reads the first ~300 words.
 
 ### Signal two — the style signal
 
-**What it measures:**
+**What it measures:** The shape of the text without reading it — how much
+sentence length varies, how varied the vocabulary is, and how much
+punctuation is used.
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** Generated prose tends
+toward even, mid-length sentences and a narrower band of vocabulary, because
+that's what "most likely next word" produces on average. Human writing is
+lumpier — a three-word sentence next to a forty-word one.
 
-**What it can't see:**
+**What it can't see:** Meaning. Anything that changes the shape without
+changing the substance moves it: adding typos, chopping sentences up, pasting
+in a quotation. That's cheap to do on purpose. Vocabulary variety also falls
+as text gets longer, so length alone can look like a signal.
 
 ### The combining rule
 
