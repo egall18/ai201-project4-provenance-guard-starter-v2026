@@ -222,12 +222,23 @@ as text gets longer, so length alone can look like a signal.
 ```bash
 $ curl -X POST http://127.0.0.1:5000/submit \
   -H "Content-Type: application/json" \
-  -d '{"text": "...", "creator_id": "..."}'
+  -d '{"text": "Artificial intelligence has transformed numerous industries in recent years. It offers significant benefits, including increased efficiency, improved accuracy, and enhanced decision-making capabilities. However, it is important to consider the ethical implications of these technologies. By addressing these challenges, organizations can ensure that AI is used responsibly and effectively.", "creator_id": "erik"}'
 ```
 
 ```json
-
+{
+  "confidence": 0.8665,
+  "content_id": "a9d986af-74dd-4cf4-8381-883ed77ddff5",
+  "guess": "unsure",
+  "label": "PLACEHOLDER — labels arrive in Milestone 5.",
+  "model_score": 0.8665,
+  "status": "decided",
+  "style_score": null
+}
 ```
+
+<!-- Milestone 3 run: one signal only, so style_score is null and confidence
+     is just the model score. Replaced with a full run in Milestone 5. -->
 
 **An appeal**
 
@@ -248,7 +259,41 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
 ```
 
 ```json
+{
+  "count": 1,
+  "entries": [
+    {
+      "combined_score": 0.8665,
+      "content_id": "a9d986af-74dd-4cf4-8381-883ed77ddff5",
+      "creator_id": "erik",
+      "guess": "unsure",
+      "label": "PLACEHOLDER — labels arrive in Milestone 5.",
+      "model_score": 0.8665,
+      "status": "decided",
+      "style_score": null,
+      "timestamp": "2026-10-29T00:48:39+00:00"
+    }
+  ]
+}
+```
 
+<!-- Milestone 3: the decision entry for the submission above, as /log returned
+     it. Replaced in Milestone 5 with the submission + appeal pair. -->
+
+**A bad input, refused and logged**
+
+```bash
+$ curl -X POST http://127.0.0.1:5000/submit \
+  -H "Content-Type: application/json" \
+  -d '{"text": "too short here", "creator_id": "eval_short"}'
+```
+
+```json
+{"error": "invalid_input", "message": "text needs at least 5 words to judge.", "reason": "text_too_short"}
+```
+
+```json
+{"creator_id": "eval_short", "event": "rejected", "reason": "text_too_short", "status": "rejected", "timestamp": "2026-10-29T00:48:39+00:00"}
 ```
 
 ---

@@ -30,6 +30,7 @@ from flask import Flask, jsonify, request
 
 import audit
 import config
+import detector
 
 app = Flask(__name__)
 
@@ -199,17 +200,73 @@ def submit():
     what should this do when `text` is missing, empty, or enormous? A crash on
     a malformed input is one of the most common real failures there is.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    # A bare list or string parses as JSON but has no .get — treat it as empty.
+    if not isinstance(payload, dict):
+        payload = {}
 
-    # TODO: delete this and build the route.
+    text = payload.get("text")
+    creator_id = payload.get("creator_id")
+
+    # ── Bad input: refuse with a 400, and leave a trace in the log ──
+    if not isinstance(creator_id, str) or not creator_id.strip():
+        return _reject("unknown", "missing_creator_id", "creator_id is required.")
+    if not isinstance(text, str):
+        return _reject(creator_id, "missing_text", "text is required and must be a string.")
+    text = text.strip()
+    if not text:
+        return _reject(creator_id, "empty_text", "text is empty.")
+    if len(text) > config.TEXT_MAX_CHARS:
+        return _reject(
+            creator_id, "text_too_long",
+            f"text is over {config.TEXT_MAX_CHARS:,} characters.",
+        )
+    if len(text.split()) < config.TEXT_MIN_WORDS:
+        return _reject(
+            creator_id, "text_too_short",
+            f"text needs at least {config.TEXT_MIN_WORDS} words to judge.",
+        )
+
+    content_id = str(uuid.uuid4())
+
+    # ── Signal one ──
+    try:
+        model_score = detector.model_signal(text)
+    except detector.DetectorUnavailable as exc:
+        audit.log_rejection(creator_id=creator_id, reason="detector_unavailable")
+        return jsonify({"error": "detector_unavailable", "message": str(exc)}), 503
+
+    # Placeholders until Milestones 4 and 5 — signal two, combining, labels.
+    style_score = None
+    confidence = model_score
+    guess = "unsure"
+    label = "PLACEHOLDER — labels arrive in Milestone 5."
+
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess=guess,
+        model_score=model_score,
+        style_score=style_score,
+        combined_score=confidence,
+        label=label,
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "guess": guess,
+        "confidence": confidence,
+        "label": label,
+        "model_score": model_score,
+        "style_score": style_score,
+        "status": "decided",
+    })
+
+
+def _reject(creator_id, reason, message):
+    """Refuse a malformed submission: log it, then answer 400."""
+    audit.log_rejection(creator_id=creator_id, reason=reason)
+    return jsonify({"error": "invalid_input", "reason": reason, "message": message}), 400
 
 
 @app.post("/appeal")

@@ -26,6 +26,12 @@ PORT = int(os.getenv("PORT", "5000"))
 # anywhere else — so it turns itself off the moment HOST isn't loopback.
 DEBUG = os.getenv("AI201_DEBUG", "1") == "1" and HOST in ("127.0.0.1", "localhost")
 
+# What /submit accepts. Under the minimum there's too little for either signal
+# to mean anything; the model only reads ~300 words, so the maximum is about
+# refusing absurd payloads, not about the signal.
+TEXT_MIN_WORDS = 5
+TEXT_MAX_CHARS = 20_000
+
 
 # ─── The local model ─────────────────────────────────────────────────────────
 # Your first signal runs a language model ON YOUR OWN MACHINE. No account, no
