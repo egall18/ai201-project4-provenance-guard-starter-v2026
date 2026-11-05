@@ -24,6 +24,7 @@ Routes:
     GET  /health      is the service up, and is the model loaded
 """
 
+import re
 import uuid
 
 from flask import Flask, jsonify, request
@@ -223,7 +224,7 @@ def submit():
             creator_id, "text_too_long",
             f"text is over {config.TEXT_MAX_CHARS:,} characters.",
         )
-    if len(text.split()) < config.TEXT_MIN_WORDS:
+    if len(english_words(text)) < config.TEXT_MIN_WORDS:
         return _reject(
             creator_id, "text_too_short",
             f"text needs at least {config.TEXT_MIN_WORDS} words to judge.",
@@ -269,6 +270,17 @@ def submit():
         "style_score": style_score,
         "status": "decided",
     })
+
+
+def english_words(text):
+    """
+    Words the signals can actually read: runs of the letters A–Z, with an
+    apostrophe allowed inside (didn't, it's). Unit 9's hardening layer.
+
+    `text.split()` counted `!!! ??? ...` as words, and Arabic too — both got a
+    label in unit 8 (MF04, MF07) from signals that couldn't read them.
+    """
+    return re.findall(r"[A-Za-z]+(?:['’][A-Za-z]+)*", text)
 
 
 def _reject(creator_id, reason, message):
