@@ -154,7 +154,7 @@ def health():
 # ── YOU BUILD THIS ────────────────────────────────────────────────────────────
 
 @app.post("/submit")
-# @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
+@limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
 def submit():
     """
     Take a piece of text, decide about it, log the decision, answer.
@@ -241,6 +241,9 @@ def submit():
     # ── Signal two, then the combining rule ──
     style_score = stylometry.style_signal(text)
     confidence = scoring.combine_signals(model_score, style_score)
+    # Did the agreement rule pull the score down? The log has to say so, or
+    # 0.91 and 0.44 combining to 0.64 can't be explained without this code.
+    capped = confidence < scoring.weighted_average(model_score, style_score)
 
     # ── The label a person reads ──
     guess, label = scoring.score_to_label(confidence)
@@ -253,6 +256,8 @@ def submit():
         style_score=style_score,
         combined_score=confidence,
         label=label,
+        capped=capped,
+        thresholds=[config.HUMAN_THRESHOLD, config.AI_THRESHOLD],
     )
 
     return jsonify({
@@ -319,6 +324,10 @@ def appeal():
         }), 404
 
     if any(e.get("event") == "appeal" for e in history):
+        audit.log_rejection(
+            creator_id=decision["creator_id"], reason="appeal_already_under_review",
+            requested_content_id=content_id,
+        )
         return jsonify({
             "error": "already_under_review",
             "message": "This piece is already waiting for a person to review it.",

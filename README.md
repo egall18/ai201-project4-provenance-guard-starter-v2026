@@ -436,7 +436,7 @@ $ curl -X POST http://127.0.0.1:5000/submit \
 
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+**My limits:** 5 per minute, 50 per day
 
 **Why those numbers and not others:**
 <!-- Think about two people: a real writer submitting their own work a few
@@ -444,16 +444,40 @@ $ curl -X POST http://127.0.0.1:5000/submit \
      thresholds. Your numbers have to be liveable for the first and hostile to
      the second. -->
 
+A real writer submits their own piece, maybe tweaks it and resubmits a few
+times. Five a minute lets them resubmit every ~12 seconds while they edit,
+and 50 a day is far more than anyone checks their own work. A script trying
+to map my thresholds needs hundreds or thousands of variations: at 50 a day,
+1,000 probes takes 20 days per identity. Tighter (3 a minute) would start to
+catch a writer fixing typos in a hurry; looser (the starter's 200 a day)
+would let a script map the bands in under a week.
+
 **What a caller counts as:** <!-- per address, or per creator_id? They fail
 differently — one script can look like a thousand callers, and one household
 can look like one. -->
+Per `creator_id`, falling back to the caller's address when there isn't one
+(the starter's `rate_limit_key`). That's fair to a household or a school
+sharing one network — each writer gets their own limit. The cost is the other
+failure: a script that invents a new `creator_id` for every request never
+hits the limit at all. I'm accepting that for now and naming it here.
 
 **The run of status codes when I pushed past it:**
 
 <!-- python run_attacks.py --flood 15 -->
 
 ```
+$ python run_attacks.py --flood 15
+15 submissions as 'flood_tester' against http://127.0.0.1:5000
+============================================================
+200 200 200 200 200 429 429 429 429 429 429 429 429 429 429
+============================================================
+10 of 15 were rate limited.
+```
 
+Each of the ten 429s left a rejection in the log, e.g.:
+
+```json
+{"timestamp": "2026-11-05T01:11:01+00:00", "creator_id": "flood_tester", "event": "rejected", "status": "rejected", "reason": "rate_limited", "limit": "5 per 1 minute"}
 ```
 
 ---

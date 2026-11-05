@@ -63,13 +63,19 @@ def combine_signals(model_score: float, style_score: float) -> float:
     writing scored model 0.884 / style 0.417 — a plain average put it at
     0.651, over the AI line. Under this rule it lands at 0.64, "unsure".
     """
-    score = (
-        config.WEIGHT_MODEL_SIGNAL * model_score
-        + config.WEIGHT_STYLE_SIGNAL * style_score
-    )
+    score = weighted_average(model_score, style_score)
     if min(model_score, style_score) < config.AGREEMENT_FLOOR:
         score = min(score, config.AI_THRESHOLD - 0.01)
     return round(score, 4)
+
+
+def weighted_average(model_score: float, style_score: float) -> float:
+    """Step 1 of the rule on its own — what the score is before any cap."""
+    return round(
+        config.WEIGHT_MODEL_SIGNAL * model_score
+        + config.WEIGHT_STYLE_SIGNAL * style_score,
+        4,
+    )
 
 
 def score_to_label(score: float) -> tuple[str, str]:
