@@ -30,6 +30,9 @@ DEBUG = os.getenv("AI201_DEBUG", "1") == "1" and HOST in ("127.0.0.1", "localhos
 # to mean anything; the model only reads ~300 words, so the maximum is about
 # refusing absurd payloads, not about the signal.
 TEXT_MIN_WORDS = 5
+# Unit 9, Milestone 6: numbers now count toward TEXT_MIN_WORDS, but at least
+# this many words must be English letters — so "12 345 6789…" is still refused.
+TEXT_MIN_LETTER_WORDS = 3
 TEXT_MAX_CHARS = 20_000
 
 

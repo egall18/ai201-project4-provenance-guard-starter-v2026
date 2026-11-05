@@ -1597,11 +1597,11 @@ criterion names.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. Unreadable submissions refused, never labelled | 10 of 10 | 10/10 | 10/10 | 10/10 |  |
-| 2. Real English writing refused by the gate | 0 of 26 | 1/26 | 1/26 | 1/26 |  |
-| 3. Refusals answered under 10 ms | 10 of 10 | 10/10 (max 0.8 ms) | 10/10 (max 1.1 ms) | 10/10 (max 0.6 ms) |  |
-| 4. 30 POSTs → exactly 30 complete log lines | 30 of 30 | 30 lines, 30 complete | 30 lines, 30 complete | 30 lines, 30 complete |  |
-| 5. Mean CPU of a typical submission | < 350 ms | 263.4 ms | 264.9 ms | 266.4 ms |  |
+| 1. Unreadable submissions refused, never labelled | 10 of 10 | 10/10 | 10/10 | 10/10 | MET |
+| 2. Real English writing refused by the gate | 0 of 26 | 1/26 | 1/26 | 1/26 | **MISSED** |
+| 3. Refusals answered under 10 ms | 10 of 10 | 10/10 (max 0.8 ms) | 10/10 (max 1.1 ms) | 10/10 (max 0.6 ms) | MET |
+| 4. 30 POSTs → exactly 30 complete log lines | 30 of 30 | 30/30 (30 complete) | 30/30 (30 complete) | 30/30 (30 complete) | MET |
+| 5. Mean CPU of a typical submission | < 350 ms | 263.4 ms | 264.9 ms | 266.4 ms | MET |
 
 **Am I really re-running?** The course warns that a model criterion coming out
 identical three times can mean it wasn't re-run. These were: each trial used
@@ -1875,6 +1875,130 @@ and CPU times are read from `logs/audit.jsonl`.
   ]
 }
 ```
+
+---
+
+## Verdicts and Diagnosis
+
+A target had to hold in every trial.
+
+1. **MET** — all 10 unreadable inputs refused with `too_few_english_words`,
+   none labelled, each logged, in all three trials.
+2. **MISSED** — 1 of 26 real English texts refused in every trial; the target
+   was 0. The one is mine: *"i worked 8 hours today"*.
+3. **MET** — the slowest refusal in any trial took 1.1 ms against a 10 ms
+   target, so no refusal ran the model.
+4. **MET** — 30 requests, 30 new log lines, all 30 complete, in all three
+   trials, including four 429s, a 404 and the forced 500.
+5. **MET** — 263.4 / 264.9 / 266.4 ms mean CPU against a 350 ms target.
+
+**Diagnosis of the miss.** *Stage: the route — the gate,
+`app.py::english_words`. Mechanism: it counts only runs of the letters A–Z,
+so a numeral isn't a word to it.* "i worked 8 hours today" is five words to
+the person who wrote it and four to the gate — `i`, `worked`, `hours`,
+`today` — so it was refused as unreadable. Any short sentence that leans on a
+number (a time, a count, a price) loses a word for every numeral, and that's
+the population this gate was supposed to protect. **Is it a pattern?** One
+symptom so far: I checked how close every one of the 26 texts sits to the
+line, and the next closest real text has 8 English words; the other two with
+digits (the weather sentence, FP05) are far above it. It's one mechanism with
+one victim in this set — but the set had only one short sentence with a
+number in it.
+
+---
+
+## The Improvement (unit 9)
+
+**What I changed:** One rule. Numbers now count toward the five-word minimum
+(`app.py::number_words`: 8, 80, 3.5, 10:30), but at least three words must
+still be English letters (`TEXT_MIN_LETTER_WORDS = 3` in `config.py`). The
+refusal message says so.
+
+**Which diagnosis pointed at it:** the criterion 2 miss — numerals invisible
+to the gate.
+
+**How I chose it.** Before changing code I re-counted every input under three
+candidate rules:
+
+| Rule | Criterion 1 | Criterion 2 | Side effect on unit 8's attack set |
+|---|---|---|---|
+| **A — numbers count, ≥ 3 letter-words** (chosen) | 10/10 | 0/26 | MF03 no longer refused |
+| B — numbers count, nothing else | 9/10 — "numbers only" gets through | 0/26 | same as A |
+| C — minimum lowered to 4 letter-words | 8/10 — both 4-word inputs get through | 0/26 | none |
+
+B and C each fix my miss by creating another one. A was predicted to fix it
+without breaking a criterion — at a cost outside my criteria.
+
+### Run Log — After
+
+`python run_capstone.py --label after` → `results/capstone_2026-11-04_1843_after.md`, same service command, same
+inputs, three trials.
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Unreadable submissions refused, never labelled | 10 of 10 | 10/10 | 10/10 | 10/10 | MET |
+| 2. Real English writing refused by the gate | 0 of 26 | 0/26 | 0/26 | 0/26 | **MET** |
+| 3. Refusals answered under 10 ms | 10 of 10 | 10/10 (max 1.0 ms) | 10/10 (max 0.6 ms) | 10/10 (max 0.8 ms) | MET |
+| 4. 30 POSTs → exactly 30 complete log lines | 30 of 30 | 30/30 (30 complete) | 30/30 (30 complete) | 30/30 (30 complete) | MET |
+| 5. Mean CPU of a typical submission | < 350 ms | 294.8 ms | 309.4 ms | 313.3 ms | MET |
+
+Side by side:
+
+| Criterion | Before (runs 1 / 2 / 3) | After (runs 1 / 2 / 3) |
+|---|---|---|
+| 1 | 10/10 · 10/10 · 10/10 | 10/10 · 10/10 · 10/10 |
+| 2 | **1/26 · 1/26 · 1/26 — MISSED** | **0/26 · 0/26 · 0/26 — MET** |
+| 3 | max 0.8 · 1.1 · 0.6 ms | max 1.0 · 0.6 · 0.8 ms |
+| 4 | 30/30 · 30/30 · 30/30 | 30/30 · 30/30 · 30/30 |
+| 5 | 263.4 · 264.9 · 266.4 ms | 294.8 · 309.4 · 313.3 ms |
+
+Criterion 2 after the fix, trial 1 — the three texts closest to the line
+(`run_capstone.py::criterion_2`):
+
+```json
+[
+  {
+    "input": "short_03_weather",
+    "words": 12,
+    "status": 200,
+    "guess": "unsure"
+  },
+  {
+    "input": "short_05_work",
+    "words": 5,
+    "status": 200,
+    "guess": "human"
+  },
+  {
+    "input": "FP08",
+    "words": 8,
+    "status": 200,
+    "guess": "unsure"
+  }
+]
+```
+
+**Did it help, and how do I know:** Yes for what it targeted. Criterion 2
+went from 1/26 to 0/26 in all three trials; my sentence now comes back
+`200`, labelled human (0.254). Criteria 1, 3 and 4 didn't move — the
+prediction said they wouldn't, and they didn't.
+
+**What it cost, honestly:**
+
+- **MF03 now gets through.** Unit 8's terminal-colour-code attack,
+  `test \x1b[31mred\x1b[0m`, was refused before. Its codes contain the
+  numbers `31` and `0` and the letter-runs `mred` and `m`, so under the new
+  rule it has five "words", three of them letters. I sent it after the run:
+  `200`, `unsure`, 0.42. My criteria didn't include it — criterion 1's
+  control-character input has no letters at all — so the trade only shows
+  because I predicted it and checked.
+- **Criterion 5 got closer to its line, and I can't fully explain why.**
+  Mean CPU rose from about 265 ms to 295–313 ms, and one single run hit
+  394.7 ms. It's not the new rule: I timed it at **0.08 ms** per call. The
+  machine's load average was 6.30 during the after-run on a 4-core laptop,
+  and PyTorch's CPU time inflates when cores are contended, so my best
+  explanation is other work on the machine — but I didn't control for it.
+  Still met; the margin went from ~85 ms to ~37 ms.
 
 ---
 

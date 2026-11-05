@@ -278,11 +278,14 @@ def submit():
             creator_id, "text_too_long",
             f"text is over {config.TEXT_MAX_CHARS:,} characters.",
         )
-    if len(english_words(text)) < config.TEXT_MIN_WORDS:
+    letters = len(english_words(text))
+    if (letters + len(number_words(text)) < config.TEXT_MIN_WORDS
+            or letters < config.TEXT_MIN_LETTER_WORDS):
         return _reject(
             creator_id, "too_few_english_words",
-            f"text needs at least {config.TEXT_MIN_WORDS} words of English to "
-            f"judge. This service can only check English text.",
+            f"text needs at least {config.TEXT_MIN_WORDS} words, at least "
+            f"{config.TEXT_MIN_LETTER_WORDS} of them English, to judge. This "
+            f"service can only check English text.",
         )
 
     content_id = str(uuid.uuid4())
@@ -337,6 +340,15 @@ def english_words(text):
     label in unit 8 (MF04, MF07) from signals that couldn't read them.
     """
     return re.findall(r"[A-Za-z]+(?:['’][A-Za-z]+)*", text)
+
+
+def number_words(text):
+    """
+    Numbers a writer uses as words: 8, 80, 3.5, 10:30. Unit 9, Milestone 6 —
+    "i worked 8 hours today" is five words to a person and was four to the
+    gate, so real writing got refused.
+    """
+    return re.findall(r"\d+(?:[.,:]\d+)*", text)
 
 
 def _reject(creator_id, reason, message):
