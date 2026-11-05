@@ -430,6 +430,38 @@ $ curl -X POST http://127.0.0.1:5000/submit \
 - *What I changed:* I cut "This is not an accusation" and ended the unsure
   label with the option to ask for a person to review it.
 
+**Moment 3 — my worst outcome, PI02 (unit 8, Milestone 2)**
+
+- *What I asked for:* Following the brief, I gave Claude PI02's input, my
+  system's answer (`human`, 0.320) and both signal scores, and asked for three
+  possible causes at different stages of my pipeline — without saying which
+  was most likely.
+- *What came back:* One cause each in signal one (the fake SYSTEM line is
+  hard to predict and raises perplexity), signal two (its fragments and
+  `=` signs shift the shape), and the combining rule (nothing pushes back
+  when both signals are under 0.5).
+- *What I changed:* Nothing in the code — I tested the causes. Scoring the
+  injected line and the AI body separately showed the body alone scores
+  0.754 and the line alone has perplexity 537, so it was signal one. That
+  became diagnosis pattern B, and it's why I say my system never obeyed the
+  instruction.
+
+**Moment 4 — choosing the fix (unit 8, Milestone 5)**
+
+- *What I asked for:* Before changing any code, I had Claude re-score every
+  text I had — the attack set, my ten pieces, the criterion 4 sets — under
+  each candidate fix: AI line at 0.62, at 0.60, and stricter input
+  validation.
+- *What came back:* A prediction for each: 0.60 would flip exactly EV07,
+  EV09 and PI03 and accuse no human text; validation would fix MF04 and MF07
+  only.
+- *What I changed:* I picked 0.60, made that one change, and checked the
+  after-run against the prediction — it matched row for row. Something that
+  went wrong along the way: Claude ran my criteria (Milestone 3) while I was
+  still waiting on the attack set for Milestone 2. I had it back that work
+  out and re-run it fresh in order, so the log and results show the
+  milestones in the order they happened.
+
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---
@@ -1374,13 +1406,39 @@ still get through; this fixed the cheapest three.
 <!-- For each attack still getting through and each criterion still missed:
      what you'd do, and why you stopped. -->
 
+**Criteria still missed:** none — all five were met before and after. Two
+things I'd still count against myself: `piece_02`, a real piece of mine, is
+labelled AI (0.700) in every run, and criterion 5 was too easy to tell me
+anything; I'd tighten it to 1.5 s.
 
+**Attacks still getting through — ten, in the same four groups as my
+diagnoses.** I stopped after one fix on purpose: the milestone asks for one
+change so its effect can be measured, and every fix below would move scores
+across the whole set at once — I'd need a fresh before/after round for each
+to know what it did.
+
+| Still broken | Stage | What I'd do next | Why I didn't |
+|---|---|---|---|
+| **PI02, EV01, PI01** | signal one | Score perplexity per sentence and use the median instead of the mean over all tokens, so one burst of strange text — a fake SYSTEM line, a run of typos — can't drag the whole score down. PI02's AI body alone scores 0.754; a median would keep most of that. | It changes every model score in every set, including my own writing. That's a signal redesign and needs its own measured round. |
+| **EV08** | signal one + route | Under ~40 words, never give a confident label either way — always "unsure". 10 words is too few tokens for perplexity to mean anything. | It would also change my own short pieces (most are 13–24 words), so it touches criterion 1 directly. |
+| **EV02, EV06** | signal two | Make sentence-length spread robust: ignore sentences under 3 words and use a median-based spread, so a sprinkle of "Really." or one giant sentence can't swing it. | Same reason — every style score moves. |
+| **EV10** | signal two + combining | Add a repetition check (repeated lines or 8-word runs) that counts as AI evidence, so low vocabulary variety from copy-paste isn't read as a plain human writer. The model signal already said 0.979; my own TTR direction vetoed it. | It means revisiting a direction I chose from data in unit 7, and my calibration set was too small to re-decide it safely. |
+| **MF04, MF07** | route | Count runs of letters instead of `split()` chunks, and refuse text with fewer than 5 real words with a 400 that says the service can only check English. | It was the other candidate fix; I chose the threshold because it fixed three attacks, not two. It's the next thing I'd do — smallest change, no effect on any score. |
+| **EV05** | both signals | Nothing. After a heavy human editing pass, both signals agree the text reads human, and I think past some amount of editing it *is* the editor's. | Deliberate. |
 
 **The trade I'd make if this ran for real:**
 
 <!-- Two sentences. Fewer wrong accusations means more AI text getting through.
      Say which way you'd go and WHO PAYS FOR IT. -->
 
+I'd go the other way from my own fix — back to an AI line of 0.65 with the
+agreement rule, and "unsure" never shown as an accusation — because a wrong
+"AI" label lands entirely on one real writer, and it's plain and non-native
+writers who sit nearest the line (FP03 and FP04, 0.03 under it) or already
+over it (my own `piece_02`). The
+people who pay are readers and the honest writers whose work sits next to AI
+text that got through unlabelled: three more evasions in this set, a cost
+spread thinly across many people instead of landing hard on one.
 
 
 <!-- ═════════════════════════════════════════════════════════════════════
