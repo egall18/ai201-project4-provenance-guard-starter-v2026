@@ -142,3 +142,93 @@ miss this immediately.
      A number you missed stays where it is, gets diagnosed, and gets a fix
      attempted. That's where the points are.
      ───────────────────────────────────────────────────────────────────────── -->
+
+---
+
+# Unit 9 — capstone criteria
+
+Written for the unit 9 extension — the English-word gate on `/submit`
+(shape B) — **before** any unit 9 results exist. Criteria 1–3 are about the
+extension; criterion 1 is the bad path. Every target has to hold in all
+three trials.
+
+An "English word" here means what `app.py::english_words` counts: a run of
+the letters A–Z, with an apostrophe allowed inside (*didn't* is one word).
+
+---
+
+## 1. Every unreadable submission is refused, never labelled
+
+I send 10 submissions that each contain fewer than 5 English words:
+punctuation only, emoji only, Arabic, Chinese, Russian, Hindi, numbers only,
+control characters, a 4-word English sentence, and English mixed with Arabic
+where only 4 of the words are English. All **10 of 10** return `400` with
+reason `too_few_english_words`, none comes back with a `guess` or `label`,
+and each leaves a `rejected` entry with that reason in `logs/audit.jsonl`.
+
+**Why this target:** One unreadable input getting a label is exactly the
+unit 8 failure this extension exists to fix — MF04 called a line of
+punctuation "written by a person". Allowing one miss in ten would allow the
+bug I'm fixing.
+
+---
+
+## 2. No real English writing is refused by the gate
+
+26 real English texts: all 13 pieces I wrote (the 10 from unit 8 and the 3 I
+didn't use), 5 more short sentences I write for this test that sit right at
+the line — 5 to 7 English words each — and the 8 human-written texts from
+the unit 8 attack set (FP01–FP08, the shortest of which is 8 words).
+**0 of 26** are refused — every one returns `200` with a label.
+
+**Why this target:** The gate is new, so it's a new way to hurt a real
+writer — refusing their honest writing instead of scoring it. Short, plain
+writing like mine is the most at risk of being cut off by a word count,
+which is why my own pieces are the core of the test set — and why five of
+them sit just above the five-word line, where a miscount would show.
+
+---
+
+## 3. A refusal is answered without running the model
+
+Every refusal from criterion 1's run — 10 per trial — has a `duration_ms`
+**under 10** in its log entry.
+
+**Why this target:** The fastest scored request I measured took 66 ms, so
+anything under 10 ms means the refusal happened before the model ran. It is
+also about 20 times the 0.5 ms I measured for a refusal in Milestone 3, so
+ordinary laptop noise won't fail it — something actually doing work before
+the gate would.
+
+---
+
+## 4. Every submission and appeal leaves exactly one record
+
+A mixed run of **30 POST requests to `/submit` or `/appeal`** covering every
+path — scored submissions, refusals, appeals, rate-limited submissions
+(`429`) and one crash forced in signal one — produces exactly **30** new
+lines in `logs/audit.jsonl`, one per request, and every one has
+`timestamp`, `route`, `duration_ms`, and either the input fields (`input_chars`, `input_english_words`, `input_sha256`) or
+`input_type`.
+
+`GET` routes (`/ping`, `/health`, `/log`) don't write records and aren't
+counted.
+
+**Why this target:** A request that leaves no record is one I can never
+diagnose — an attack that shows up only as an absence looks like a quiet
+afternoon. Every kind of request has to be in the run, including the crash,
+which left nothing at all before this unit.
+
+---
+
+## 5. A typical submission costs under 0.35 CPU-seconds
+
+After one warm-up submission, my 10 pieces from unit 8 are submitted one at
+a time. The mean `cpu_ms` of those 10 decisions, read from the log, is
+**under 350**.
+
+**Why this target:** I measured a mean of 0.27 CPU-seconds in Milestone 3,
+with the gate and the new logging already in place. 0.35 is about 1.3 times
+that — tight enough that any real added cost, like the model being reloaded
+or logging that re-reads the whole file, would miss it, and loose enough to
+absorb ordinary variation on a laptop.
