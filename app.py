@@ -226,8 +226,9 @@ def submit():
         )
     if len(english_words(text)) < config.TEXT_MIN_WORDS:
         return _reject(
-            creator_id, "text_too_short",
-            f"text needs at least {config.TEXT_MIN_WORDS} words to judge.",
+            creator_id, "too_few_english_words",
+            f"text needs at least {config.TEXT_MIN_WORDS} words of English to "
+            f"judge. This service can only check English text.",
         )
 
     content_id = str(uuid.uuid4())
