@@ -1587,6 +1587,297 @@ and curl overhead aren't in them. Machine: Intel Core i5-8259U (4 cores,
 it: the model reads up to 400 tokens, so a ~20-word piece costs about a tenth
 of a full one.
 
+## Run Log — Before
+
+`python run_capstone.py --label before` against the service started with the
+documented gunicorn command → `results/capstone_2026-11-04_1839_before.md`. Three trials, nothing changed between
+them. The test is `run_capstone.py` — written in this milestone, after
+`criteria.md` was committed — and it reports exactly the number each
+criterion names.
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Unreadable submissions refused, never labelled | 10 of 10 | 10/10 | 10/10 | 10/10 |  |
+| 2. Real English writing refused by the gate | 0 of 26 | 1/26 | 1/26 | 1/26 |  |
+| 3. Refusals answered under 10 ms | 10 of 10 | 10/10 (max 0.8 ms) | 10/10 (max 1.1 ms) | 10/10 (max 0.6 ms) |  |
+| 4. 30 POSTs → exactly 30 complete log lines | 30 of 30 | 30 lines, 30 complete | 30 lines, 30 complete | 30 lines, 30 complete |  |
+| 5. Mean CPU of a typical submission | < 350 ms | 263.4 ms | 264.9 ms | 266.4 ms |  |
+
+**Am I really re-running?** The course warns that a model criterion coming out
+identical three times can mean it wasn't re-run. These were: each trial used
+fresh `creator_id`s, criterion 4 counted 30 *new* log lines each time, and
+criterion 5's CPU times differ every trial (263.4, 264.9, 266.4 ms).
+Criteria 1–3 come out identical because the gate and both signals are
+deterministic — the same text gets the same answer.
+
+**The one thing that didn't hold.** Criterion 2's single refusal, in all three
+trials, is one of the five short sentences I wrote for it: *"i worked 8 hours
+today"*. To a person that's five words; to the gate it's four — `i`,
+`worked`, `hours`, `today` — because `8` isn't a run of letters. A note on my
+five: I wrote them as answers to prompts and used them exactly as written.
+Four came out longer than the "5 to 7 words" the criterion describes (8, 11,
+21 and 33 English words); the one that matters, sentence 5, is right at the
+line.
+
+**Real output from trial 1**, by criterion. Every row was produced by
+`run_capstone.py` — `criteria_1_and_3`, `criterion_2`, `criterion_4` and
+`criterion_5` — sending to `app.py::submit` and `app.py::appeal`; durations
+and CPU times are read from `logs/audit.jsonl`.
+
+**Criterion 1 and 3 — `run_capstone.py::criteria_1_and_3`**
+
+```json
+[
+  {
+    "input": "punctuation",
+    "status": 400,
+    "reason": "too_few_english_words",
+    "got_label": false,
+    "logged_reason": "too_few_english_words",
+    "duration_ms": 0.8
+  },
+  {
+    "input": "emoji",
+    "status": 400,
+    "reason": "too_few_english_words",
+    "got_label": false,
+    "logged_reason": "too_few_english_words",
+    "duration_ms": 0.4
+  },
+  {
+    "input": "arabic",
+    "status": 400,
+    "reason": "too_few_english_words",
+    "got_label": false,
+    "logged_reason": "too_few_english_words",
+    "duration_ms": 0.4
+  },
+  {
+    "input": "chinese",
+    "status": 400,
+    "reason": "too_few_english_words",
+    "got_label": false,
+    "logged_reason": "too_few_english_words",
+    "duration_ms": 0.5
+  },
+  {
+    "input": "russian",
+    "status": 400,
+    "reason": "too_few_english_words",
+    "got_label": false,
+    "logged_reason": "too_few_english_words",
+    "duration_ms": 0.3
+  },
+  {
+    "input": "hindi",
+    "status": 400,
+    "reason": "too_few_english_words",
+    "got_label": false,
+    "logged_reason": "too_few_english_words",
+    "duration_ms": 0.4
+  },
+  {
+    "input": "numbers",
+    "status": 400,
+    "reason": "too_few_english_words",
+    "got_label": false,
+    "logged_reason": "too_few_english_words",
+    "duration_ms": 0.3
+  },
+  {
+    "input": "control",
+    "status": 400,
+    "reason": "too_few_english_words",
+    "got_label": false,
+    "logged_reason": "too_few_english_words",
+    "duration_ms": 0.3
+  },
+  {
+    "input": "four_english_words",
+    "status": 400,
+    "reason": "too_few_english_words",
+    "got_label": false,
+    "logged_reason": "too_few_english_words",
+    "duration_ms": 0.4
+  },
+  {
+    "input": "english_plus_arabic",
+    "status": 400,
+    "reason": "too_few_english_words",
+    "got_label": false,
+    "logged_reason": "too_few_english_words",
+    "duration_ms": 0.3
+  }
+]
+```
+
+**Criterion 3 summary**
+
+```json
+{
+  "under_10ms": 10,
+  "of": 10,
+  "max_ms": 0.8,
+  "durations_ms": [
+    0.8,
+    0.4,
+    0.4,
+    0.5,
+    0.3,
+    0.4,
+    0.3,
+    0.3,
+    0.4,
+    0.3
+  ]
+}
+```
+
+**Criterion 2 — `run_capstone.py::criterion_2` (the refused row, then the first three of 26)**
+
+```json
+{
+  "refused": 1,
+  "of": 26,
+  "refused_rows": [
+    {
+      "input": "short_05_work",
+      "words": 5,
+      "status": 400,
+      "guess": null,
+      "reason": "too_few_english_words"
+    }
+  ],
+  "first_rows": [
+    {
+      "input": "mine_01",
+      "words": 13,
+      "status": 200,
+      "guess": "human",
+      "reason": null
+    },
+    {
+      "input": "mine_02",
+      "words": 39,
+      "status": 200,
+      "guess": "ai",
+      "reason": null
+    },
+    {
+      "input": "mine_03",
+      "words": 23,
+      "status": 200,
+      "guess": "human",
+      "reason": null
+    }
+  ]
+}
+```
+
+**Criterion 4 — `run_capstone.py::criterion_4` (counts, then the first two and last two new log lines)**
+
+```json
+{
+  "requests": 30,
+  "new_log_lines": 30,
+  "with_all_fields": 30,
+  "status_counts": {
+    "scored:200": 6,
+    "flood:200": 5,
+    "flood:429": 4,
+    "refused:400": 8,
+    "appeal:200": 5,
+    "appeal_fake:404": 1,
+    "crash:500": 1
+  },
+  "sample_entries": [
+    {
+      "timestamp": "2026-11-05T02:39:14+00:00",
+      "content_id": "d711e60d-4b52-4067-9e97-1f4659690bfd",
+      "creator_id": "cap_t1_c4_scored_0",
+      "guess": "human",
+      "model_score": 0.1602,
+      "style_score": 0.5,
+      "combined_score": 0.3301,
+      "status": "decided",
+      "capped": false,
+      "route": "/submit",
+      "duration_ms": 62.4,
+      "cpu_ms": 231.7,
+      "input_chars": 76,
+      "input_english_words": 13,
+      "input_sha256": "8ca0180fb94588a7"
+    },
+    {
+      "timestamp": "2026-11-05T02:39:14+00:00",
+      "content_id": "262a578b-08db-4d28-8756-b6c4da6088c3",
+      "creator_id": "cap_t1_c4_scored_1",
+      "guess": "ai",
+      "model_score": 0.6898,
+      "style_score": 0.7094,
+      "combined_score": 0.6996,
+      "status": "decided",
+      "capped": false,
+      "route": "/submit",
+      "duration_ms": 88.5,
+      "cpu_ms": 338.5,
+      "input_chars": 212,
+      "input_english_words": 39,
+      "input_sha256": "ffbb8ac3f2253c03"
+    },
+    {
+      "timestamp": "2026-11-05T02:39:15+00:00",
+      "creator_id": "unknown",
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "appeal_not_found",
+      "requested_content_id": "not-a-real-id-1",
+      "route": "/appeal",
+      "duration_ms": 5.0,
+      "cpu_ms": 17.7,
+      "input_type": "NoneType"
+    },
+    {
+      "timestamp": "2026-11-05T02:39:15+00:00",
+      "creator_id": "cap_t1_c4_crash",
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "internal_error",
+      "error": "RuntimeError: forced crash for criterion 4",
+      "route": "/submit",
+      "duration_ms": 1.3,
+      "cpu_ms": 1.1,
+      "input_chars": 46,
+      "input_english_words": 9,
+      "input_sha256": "80207e112f6cf953"
+    }
+  ]
+}
+```
+
+**Criterion 5 — `run_capstone.py::criterion_5`**
+
+```json
+{
+  "mean_cpu_ms": 263.4,
+  "max_cpu_ms": 348.2,
+  "cpu_ms": [
+    237.1,
+    348.2,
+    248.8,
+    249.0,
+    256.1,
+    304.2,
+    242.9,
+    245.9,
+    262.7,
+    239.0
+  ]
+}
+```
+
+---
+
 <!-- ═════════════════════════════════════════════════════════════════════
 
      SUBMISSION CHECKLIST — unit 7
