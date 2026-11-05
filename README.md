@@ -623,17 +623,495 @@ while someone who typed a fake system message got cleared.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |
+| 1. My own writing labelled high-confidence AI | ≤ 2 of 10 | 1/10 | 1/10 | 1/10 |  |
+| 2. Bad input → 400 + rejection logged, no 500 | 5 of 5 | 5/5 | 5/5 | 5/5 |  |
+| 3. Appeals: real → under_review + logged; fake → 404, nothing logged | 10/10 + 3/3 | 10/10 + 3/3 | 10/10 + 3/3 | 10/10 + 3/3 |  |
+| 4. Mean AI score − mean human score | ≥ 0.30 | 0.329 | 0.329 | 0.329 |  |
+| 5. Every submission after warm-up within 3 s | 30 of 30 | 30/30 (max 1.02 s) | 30/30 (max 0.86 s) | 30/30 (max 0.81 s) |  |
+
+All three trials came out identical, score for score — expected, since
+nothing in either signal is random once the model is loaded. Only the
+timings differ between trials.
+
+**How I measured it.** `run_eval.py` only sent text to `/submit`, so I
+extended it (and `scenarios.py::validate`) for the criteria it couldn't see:
+each result now records `seconds` (criterion 5) and the newest audit entry,
+`logged` (criterion 2), and an `appeals` scenario submits ten texts, appeals
+each, checks the log, then appeals three fake ids — one of them a real id
+with its last character changed (criterion 3). Criterion 1 reads my ten
+pieces from `my_writing/`, saved exactly as I typed them, typos included.
+The criterion 4 AI texts were written by Claude on request; the human ones
+are verbatim mid-book passages from Project Gutenberg (Twain, Austen,
+Melville, Dickens, London). Criterion 5 counts every `/submit` in the run
+except the appeal scenario's (which isn't timed), after one warm-up request
+that took 11.5 s while the model loaded.
 
 **Real output from one trial**, pasted as text, naming the file and function
 that produced it:
 
-```json
+All from trial 1 of `results/run_2026-11-04_1749_before.md`, produced by `run_eval.py::main` sending to
+`app.py::submit` (and `app.py::appeal` for criterion 3). The `label` field is
+dropped to keep this readable — `guess` says which label it was.
 
+**Criterion 1 — my own writing**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.3301,
+    "model_score": 0.1602,
+    "style_score": 0.5,
+    "seconds": 0.072,
+    "logged": {
+      "creator_id": "eval_my own writi_1",
+      "status": "decided",
+      "content_id": "05c45fe3-1794-4f87-8e31-42e682477c10"
+    },
+    "sent": "Last weekend i went to Halloween October festival with my family and f"
+  },
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.6996,
+    "model_score": 0.6898,
+    "style_score": 0.7094,
+    "seconds": 0.128,
+    "logged": {
+      "creator_id": "eval_my own writi_2",
+      "status": "decided",
+      "content_id": "7342c235-8503-4ce9-b433-0dc1fce61fb0"
+    },
+    "sent": "My morning routine consists of waking up, getting up, using the restro"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.31,
+    "model_score": 0.4534,
+    "style_score": 0.1667,
+    "seconds": 0.074,
+    "logged": {
+      "creator_id": "eval_my own writi_3",
+      "status": "decided",
+      "content_id": "2e6f9fa4-452f-45fb-bf5e-565d7dec7e62"
+    },
+    "sent": "The best meal i had recently was a burger from apple bs and the worst "
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.4271,
+    "model_score": 0.382,
+    "style_score": 0.4722,
+    "seconds": 0.074,
+    "logged": {
+      "creator_id": "eval_my own writi_4",
+      "status": "decided",
+      "content_id": "a59c46dc-749c-46be-bfcf-ad9e5cf3e996"
+    },
+    "sent": "SOmething that annoyed me this week was not being able to go to the gy"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.313,
+    "model_score": 0.1467,
+    "style_score": 0.4792,
+    "seconds": 0.07,
+    "logged": {
+      "creator_id": "eval_my own writi_5",
+      "status": "decided",
+      "content_id": "494231a7-4acd-4df5-9b34-bff6328391b6"
+    },
+    "sent": "I got into coding by taking a CS class in high school where i programm"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.2883,
+    "model_score": 0.1806,
+    "style_score": 0.3959,
+    "seconds": 0.085,
+    "logged": {
+      "creator_id": "eval_my own writi_6",
+      "status": "decided",
+      "content_id": "8508bf58-1173-4f86-910d-db20442a05ea"
+    },
+    "sent": "I was a soccer referee and managed soccer games, one thing i remember "
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.5485,
+    "model_score": 0.6178,
+    "style_score": 0.4792,
+    "seconds": 0.071,
+    "logged": {
+      "creator_id": "eval_my own writi_7",
+      "status": "decided",
+      "content_id": "cf838330-9066-4d27-8a33-210761728a00"
+    },
+    "sent": "A goal i have for next year is to get into shape and run a marathon."
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.3336,
+    "model_score": 0.1671,
+    "style_score": 0.5,
+    "seconds": 0.067,
+    "logged": {
+      "creator_id": "eval_my own writi_8",
+      "status": "decided",
+      "content_id": "94ae2fd1-10fc-4aec-9bb3-5a6c34e5fcfd"
+    },
+    "sent": "I reccomend watching the new spiderman movie since its very awesome an"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.2747,
+    "model_score": 0.0493,
+    "style_score": 0.5,
+    "seconds": 0.077,
+    "logged": {
+      "creator_id": "eval_my own writi_9",
+      "status": "decided",
+      "content_id": "5e5cc842-49f1-41a9-b431-a915209f172a"
+    },
+    "sent": "Festivals are overrated since they advertise cool crazy things but whe"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.4123,
+    "model_score": 0.1104,
+    "style_score": 0.7142,
+    "seconds": 0.066,
+    "logged": {
+      "creator_id": "eval_my own writi_10",
+      "status": "decided",
+      "content_id": "6ca46c64-1975-4185-a79a-cbe8185da074"
+    },
+    "sent": "Im good at cooking, i watch yotube videos or have my mom teach me."
+  }
+]
+```
+
+**Criterion 2 — bad input**
+
+```json
+[
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "seconds": 0.003,
+    "logged": {
+      "creator_id": "eval_bad_missing",
+      "status": "rejected",
+      "reason": "missing_text"
+    },
+    "sent": "{\"creator_id\": \"eval_bad_missing\"}"
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "seconds": 0.002,
+    "logged": {
+      "creator_id": "eval_bad_blank",
+      "status": "rejected",
+      "reason": "empty_text"
+    },
+    "sent": "   "
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "seconds": 0.003,
+    "logged": {
+      "creator_id": "eval_bad_short",
+      "status": "rejected",
+      "reason": "text_too_short"
+    },
+    "sent": "too short here"
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "seconds": 0.003,
+    "logged": {
+      "creator_id": "eval_bad_huge",
+      "status": "rejected",
+      "reason": "text_too_long"
+    },
+    "sent": "word word word word word word word word word word word word word word "
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "seconds": 0.003,
+    "logged": {
+      "creator_id": "eval_bad_null",
+      "status": "rejected",
+      "reason": "missing_text"
+    },
+    "sent": "{\"text\": null, \"creator_id\": \"eval_bad_null\"}"
+  }
+]
+```
+
+**Criterion 3 — appeal path** (2 of the 10 real appeals, then all 3 fakes; the other 8 real ones look the same)
+
+```json
+[
+  {
+    "kind": "real",
+    "content_id": "36100f48-7e70-485f-95bc-6869c5466d6a",
+    "submit_status": 200,
+    "appeal_status": 200,
+    "status_returned": "under_review",
+    "appeal_logged": true
+  },
+  {
+    "kind": "real",
+    "content_id": "5f7ae14b-0516-4090-a8b9-f5b2132d42ea",
+    "submit_status": 200,
+    "appeal_status": 200,
+    "status_returned": "under_review",
+    "appeal_logged": true
+  },
+  {
+    "kind": "fake",
+    "content_id": "not-a-real-id",
+    "appeal_status": 404,
+    "appeal_logged": false
+  },
+  {
+    "kind": "fake",
+    "content_id": "00000000-0000-0000-0000-000000000000",
+    "appeal_status": 404,
+    "appeal_logged": false
+  },
+  {
+    "kind": "fake",
+    "content_id": "83a28f49-2177-4e07-9739-0b151e4301e2",
+    "appeal_status": 404,
+    "appeal_logged": false
+  }
+]
+```
+
+**Criterion 4 — clearly AI**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.7563,
+    "model_score": 0.9245,
+    "style_score": 0.5881,
+    "seconds": 0.189,
+    "logged": {
+      "creator_id": "eval_clearly AI_1",
+      "status": "decided",
+      "content_id": "8100b71d-a85b-4093-90e2-24cbacaf63a0"
+    },
+    "sent": "Regular exercise offers numerous benefits for both physical and mental"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.5979,
+    "model_score": 0.6606,
+    "style_score": 0.5352,
+    "seconds": 0.149,
+    "logged": {
+      "creator_id": "eval_clearly AI_2",
+      "status": "decided",
+      "content_id": "3d7b05ff-f9a9-4c85-abc6-352feec1aeb4"
+    },
+    "sent": "Remote work has fundamentally changed the way many organizations opera"
+  },
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.7384,
+    "model_score": 0.7948,
+    "style_score": 0.682,
+    "seconds": 0.16,
+    "logged": {
+      "creator_id": "eval_clearly AI_3",
+      "status": "decided",
+      "content_id": "7221e4b4-9b22-493d-8ec0-f525e4f3c300"
+    },
+    "sent": "Reading is one of the most valuable habits a person can develop. It ex"
+  },
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.8599,
+    "model_score": 0.9384,
+    "style_score": 0.7815,
+    "seconds": 0.161,
+    "logged": {
+      "creator_id": "eval_clearly AI_4",
+      "status": "decided",
+      "content_id": "56969782-2bc2-4601-aa9b-31f63cab84d8"
+    },
+    "sent": "Climate change is one of the most pressing challenges facing the world"
+  },
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.7721,
+    "model_score": 0.809,
+    "style_score": 0.7352,
+    "seconds": 0.154,
+    "logged": {
+      "creator_id": "eval_clearly AI_5",
+      "status": "decided",
+      "content_id": "8b05ce8c-eee0-4716-87c2-efdc2afcd575"
+    },
+    "sent": "Effective communication is essential in both personal and professional"
+  }
+]
+```
+
+**Criterion 4 — clearly human**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.3652,
+    "model_score": 0.2471,
+    "style_score": 0.4833,
+    "seconds": 0.191,
+    "logged": {
+      "creator_id": "eval_clearly huma_1",
+      "status": "decided",
+      "content_id": "1893ba64-aa09-40cf-a9e2-364fc0395174"
+    },
+    "sent": "At school the children made so much of him and of Joe, and delivered s"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.4565,
+    "model_score": 0.5066,
+    "style_score": 0.4063,
+    "seconds": 0.257,
+    "logged": {
+      "creator_id": "eval_clearly huma_2",
+      "status": "decided",
+      "content_id": "791e0535-c537-48fd-aa90-aaa682a5a4e0"
+    },
+    "sent": "At length the chaise arrived, the trunks were fastened on, the parcels"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.4123,
+    "model_score": 0.3378,
+    "style_score": 0.4868,
+    "seconds": 0.252,
+    "logged": {
+      "creator_id": "eval_clearly huma_3",
+      "status": "decided",
+      "content_id": "6b7b7613-74e2-4c96-97ea-bdf96d929922"
+    },
+    "sent": "In the first place, you are struck by the general contrast between the"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.51,
+    "model_score": 0.3579,
+    "style_score": 0.6621,
+    "seconds": 0.299,
+    "logged": {
+      "creator_id": "eval_clearly huma_4",
+      "status": "decided",
+      "content_id": "249c7758-1bf7-4194-b2c2-b22268c4d65f"
+    },
+    "sent": "Through gloomy vaults where the light of day had never shone, past hid"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.337,
+    "model_score": 0.3085,
+    "style_score": 0.3656,
+    "seconds": 0.271,
+    "logged": {
+      "creator_id": "eval_clearly huma_5",
+      "status": "decided",
+      "content_id": "9a2ad0b2-5a0a-4fb3-9a0b-8e2b594d8df7"
+    },
+    "sent": "And through it all Buck staggered along at the head of the team as in "
+  }
+]
+```
+
+**Criterion 5 — speed**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "human",
+    "seconds": 0.065,
+    "sent": "The bus was late again today."
+  },
+  {
+    "status": 200,
+    "guess": "ai",
+    "seconds": 0.19,
+    "sent": "Regular exercise offers numerous benefits for both physical and mental"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "seconds": 0.767,
+    "sent": "At school the children made so much of him and of Joe, and delivered s"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "seconds": 0.728,
+    "sent": "At school the children made so much of him and of Joe, and delivered s"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "seconds": 1.016,
+    "sent": "At school the children made so much of him and of Joe, and delivered s"
+  }
+]
 ```
 
 **Diagnoses**

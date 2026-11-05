@@ -112,6 +112,13 @@ def main():
 
         trials = []
         for trial in range(1, args.trials + 1):
+            if scenario.get("appeals"):
+                results = run_appeal_trial(requests, args, scenario["appeals"], trial)
+                trials.append(results)
+                print(f"  trial {trial}: "
+                      f"{', '.join(str(r.get('appeal_status')) for r in results)}")
+                continue
+
             results = []
             for i, body in enumerate(bodies_for(scenario), 1):
                 preview = describe(body)
@@ -126,6 +133,8 @@ def main():
                         "model_score": payload.get("model_score"),
                         "style_score": payload.get("style_score"),
                         "label": payload.get("label"),
+                        "seconds": round(response.elapsed.total_seconds(), 3),
+                        "logged": latest_log_entry(requests, args),
                         "sent": preview,
                     })
                 except Exception as exc:  # noqa: BLE001
@@ -133,12 +142,77 @@ def main():
                                     "sent": preview})
 
             trials.append(results)
-            guesses = [r.get("guess") or "—" for r in results]
+            guesses = [r.get("guess") or str(r.get("status")) for r in results]
             print(f"  trial {trial}: {', '.join(guesses)}")
 
         rows.append({"scenario": scenario, "trials": trials})
 
     write_report(rows, args)
+
+
+def latest_log_entry(requests, args):
+    """
+    The newest audit entry, cut down to what a criterion checks — whether this
+    request left a trace, and what kind. Added for criterion 2 ("each one adds
+    a rejected entry"), which the response alone can't show.
+    """
+    entries = requests.get(f"{args.url}/log?limit=1", timeout=args.timeout).json()["entries"]
+    if not entries:
+        return None
+    e = entries[0]
+    return {k: e.get(k) for k in ("creator_id", "status", "reason", "content_id") if e.get(k)}
+
+
+def run_appeal_trial(requests, args, spec, trial):
+    """
+    One trial of the appeal criterion. Added — run_eval only sent text before.
+
+    Submits each of spec["texts"] under a creator_id unique to this trial (so
+    trials don't collide with each other's appeals), appeals it, and checks
+    the log for the appeal entry. Then appeals each of spec["fake_ids"] and
+    checks no appeal entry was written for it.
+    """
+    results = []
+    for i, text in enumerate(spec["texts"], 1):
+        creator = f"eval_appeal_t{trial}_{i}"
+        try:
+            sub = requests.post(f"{args.url}/submit", timeout=args.timeout,
+                                json={"text": text, "creator_id": creator})
+            content_id = sub.json().get("content_id")
+            ap = requests.post(f"{args.url}/appeal", timeout=args.timeout,
+                               json={"content_id": content_id,
+                                     "reasoning": "I wrote this myself."})
+            log = requests.get(f"{args.url}/log", timeout=args.timeout).json()["entries"]
+            appeal_entries = [e for e in log
+                              if e.get("content_id") == content_id and e.get("event") == "appeal"]
+            results.append({
+                "kind": "real",
+                "content_id": content_id,
+                "submit_status": sub.status_code,
+                "appeal_status": ap.status_code,
+                "status_returned": ap.json().get("status"),
+                "appeal_logged": len(appeal_entries) == 1,
+            })
+        except Exception as exc:  # noqa: BLE001
+            results.append({"kind": "real", "appeal_status": None,
+                            "error": f"{type(exc).__name__}: {exc}"})
+
+    for fake in spec["fake_ids"]:
+        try:
+            ap = requests.post(f"{args.url}/appeal", timeout=args.timeout,
+                               json={"content_id": fake, "reasoning": "typo test"})
+            log = requests.get(f"{args.url}/log", timeout=args.timeout).json()["entries"]
+            results.append({
+                "kind": "fake",
+                "content_id": fake,
+                "appeal_status": ap.status_code,
+                "appeal_logged": any(e.get("content_id") == fake and e.get("event") == "appeal"
+                                     for e in log),
+            })
+        except Exception as exc:  # noqa: BLE001
+            results.append({"kind": "fake", "appeal_status": None,
+                            "error": f"{type(exc).__name__}: {exc}"})
+    return results
 
 
 def write_report(rows, args):
