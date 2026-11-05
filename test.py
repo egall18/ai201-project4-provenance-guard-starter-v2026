@@ -98,7 +98,9 @@ def parse_requirements(path):
     """Yield (distribution_name, raw_specifier) for each real requirement line."""
     reqs = []
     for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.split("#")[0].strip()
+        # Drop comments, and any environment marker after ";" — pip reads
+        # `numpy<2; sys_platform == "darwin"` as a condition, not a pin.
+        line = raw.split("#")[0].split(";")[0].strip()
         if not line or line.startswith("-"):
             continue
         name = re.split(r"[<>=!~\[;]", line, maxsplit=1)[0].strip()

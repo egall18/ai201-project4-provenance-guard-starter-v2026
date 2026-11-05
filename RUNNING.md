@@ -239,7 +239,7 @@ your write-up; that's the deliverable.
 | | |
 |---|---|
 | Python | **3.12** (3.11 also fine). Not 3.13 on an Intel Mac — PyTorch stopped shipping Intel-Mac builds at 2.2.2, which supports up to 3.12. Not 3.14 anywhere |
-| Packages | `requirements.txt` — flask 3.1, flask-limiter 3.12, transformers 4.57, torch 2.2.2 (Intel Mac) or newer, gunicorn 23, requests, certifi |
+| Packages | `requirements.txt` — flask 3.1, flask-limiter 3.12, transformers 4.57, torch 2.2.2 (Intel Mac) or newer, gunicorn 23, requests, certifi. On an Intel Mac it also pins `numpy<2`, which torch 2.2.2 needs — found by the clean-clone test |
 | Model | `gpt2`, downloaded once by `python detector.py` into `~/.cache/huggingface` — **about 525 MB on disk** |
 | Disk / memory | ~9 GB free for torch + model; the running service holds the model in memory |
 | Port | 5000. On macOS, AirPlay Receiver also listens on 5000 — turn it off, or use `--bind 127.0.0.1:5001` and point curl there |

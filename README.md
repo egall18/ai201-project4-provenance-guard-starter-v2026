@@ -1489,6 +1489,104 @@ get 400.
 90-minute limit. The run path, structured logging and cost measurement are
 required in every shape and come in Milestone 3.
 
+## Run Path
+
+**Path B — local, with logs.** This runs a 525 MB language model in memory
+alongside PyTorch; the course's free hosting tier gives 512 MB, so it's over
+budget before the first request. `RUNNING.md` → *Path B — how this runs*
+holds the environment and the one start command:
+
+```bash
+gunicorn app:app --bind 127.0.0.1:5000 --workers 1 --timeout 120
+```
+
+**Tested from a clean checkout.** I cloned the repo into a new folder and
+followed `RUNNING.md` word for word. It ran — `test.py` passed, gunicorn
+started, `/submit` answered and logged — but it hit two things a reader
+would have hit:
+
+1. **NumPy 2 on an Intel Mac.** A clean `pip install` put NumPy 2.5.4 next
+   to torch 2.2.2 (the last Intel-Mac build, compiled for NumPy 1.x), and
+   every start printed "A module that was compiled using NumPy 1.x cannot be
+   run in NumPy 2.5.4 as it may crash." My own setup had been fixed by hand in
+   unit 7 and never written down. Fixed in `requirements.txt` with a pin that
+   applies to Intel Macs only: `numpy<2; sys_platform == "darwin" and
+   platform_machine == "x86_64"`.
+2. **`test.py` misread that pin.** It treated the `==` inside the platform
+   condition as a version pin and warned. Fixed by having it ignore the part
+   after `;`, which is what pip does. After both fixes the clean clone reports
+   9 passed, 0 failed, 0 to look at.
+
+What this test did *not* cover: the model download. The clone shared my
+`~/.cache/huggingface`, so `python detector.py` found the model already
+there. On a new machine that step downloads about 525 MB.
+
+---
+
+## Instrumentation
+
+Every request now writes one JSON line to `logs/audit.jsonl` — decisions,
+appeals, refusals, rate limits and crashes alike. Fields added this unit
+(`app.py::run_fields`):
+
+| Field | What it records |
+|---|---|
+| `route` | `/submit` or `/appeal` |
+| `duration_ms` | wall time inside the service, request in to log written |
+| `cpu_ms` | CPU time the process spent on it (PyTorch uses several cores, so this can exceed `duration_ms`) |
+| `input_chars`, `input_english_words` | the size of what came in |
+| `input_sha256` | first 16 hex characters of the text's SHA-256 — matches a log line to a known input without storing anyone's writing |
+| `input_type` | when `text` wasn't a string: what it was, or `unparseable` |
+
+What came out was already there: `guess`, `model_score`, `style_score`,
+`combined_score`, `label`, `status`, or a refusal `reason`. A crash used to
+leave no record at all; `app.py::_unexpected` now logs it as
+`internal_error` with the exception, and returns a 500 that says so.
+
+**Extract from a real session** — the gunicorn start command above, one
+warm-up, then the cost runs, then one of each other path. The `label`
+sentence and `thresholds` are left out to keep each entry on one line. In
+order: the warm-up (model loading — 8.7 s); two of my own pieces; one
+400-token text; Arabic refused; punctuation refused; an appeal on my
+morning-routine piece; a body that isn't valid JSON; the sixth rapid
+submission from one creator, rate-limited; and a crash I forced in signal
+one through Flask's test client, to prove a failure leaves a record.
+
+```json
+{"timestamp": "2026-11-05T02:25:37+00:00", "content_id": "c9c0bfbf-674a-45f5-b9d0-461b13226f03", "creator_id": "u9_cost_warmup", "guess": "human", "model_score": 0.1798, "style_score": 0.5, "combined_score": 0.3399, "status": "decided", "capped": false, "route": "/submit", "duration_ms": 8649.1, "cpu_ms": 8113.5, "input_chars": 61, "input_english_words": 12, "input_sha256": "934b638adbee17a7"}
+{"timestamp": "2026-11-05T02:25:37+00:00", "content_id": "d0c271fb-1aa0-4a90-b5c4-c9ad1e1c1d88", "creator_id": "u9_cost_typical_1", "guess": "human", "model_score": 0.1602, "style_score": 0.5, "combined_score": 0.3301, "status": "decided", "capped": false, "route": "/submit", "duration_ms": 69.1, "cpu_ms": 250.5, "input_chars": 76, "input_english_words": 13, "input_sha256": "8ca0180fb94588a7"}
+{"timestamp": "2026-11-05T02:25:37+00:00", "content_id": "711b9c6e-0b56-4736-8862-48cf841d2eb6", "creator_id": "u9_cost_typical_2", "guess": "ai", "model_score": 0.6898, "style_score": 0.7094, "combined_score": 0.6996, "status": "decided", "capped": false, "route": "/submit", "duration_ms": 97.1, "cpu_ms": 357.4, "input_chars": 212, "input_english_words": 39, "input_sha256": "ffbb8ac3f2253c03"}
+{"timestamp": "2026-11-05T02:25:38+00:00", "content_id": "16ea00d6-240a-4dc2-a11d-01217306de29", "creator_id": "u9_cost_worst_1", "guess": "unsure", "model_score": 0.3886, "style_score": 0.4385, "combined_score": 0.4135, "status": "decided", "capped": false, "route": "/submit", "duration_ms": 835.7, "cpu_ms": 2875.6, "input_chars": 6513, "input_english_words": 1148, "input_sha256": "8f3baab5e427ebf2"}
+{"timestamp": "2026-11-05T02:25:57+00:00", "creator_id": "u9_session_arabic", "event": "rejected", "status": "rejected", "reason": "too_few_english_words", "route": "/submit", "duration_ms": 0.5, "cpu_ms": 0.5, "input_chars": 58, "input_english_words": 0, "input_sha256": "215dfe2d19a971ec"}
+{"timestamp": "2026-11-05T02:25:57+00:00", "creator_id": "u9_session_punct", "event": "rejected", "status": "rejected", "reason": "too_few_english_words", "route": "/submit", "duration_ms": 0.3, "cpu_ms": 0.3, "input_chars": 31, "input_english_words": 0, "input_sha256": "66eb457f9df79d03"}
+{"timestamp": "2026-11-05T02:25:57+00:00", "content_id": "711b9c6e-0b56-4736-8862-48cf841d2eb6", "creator_id": "u9_cost_typical_2", "event": "appeal", "status": "under_review", "reasoning": "This is my morning routine. I wrote it myself.", "route": "/appeal", "duration_ms": 3.7, "cpu_ms": 3.6, "input_type": "NoneType"}
+{"timestamp": "2026-11-05T02:25:57+00:00", "creator_id": "unknown", "event": "rejected", "status": "rejected", "reason": "missing_creator_id", "route": "/submit", "duration_ms": 0.5, "cpu_ms": 0.5, "input_type": "unparseable"}
+{"timestamp": "2026-11-05T02:25:57+00:00", "creator_id": "u9_session_flood", "event": "rejected", "status": "rejected", "reason": "rate_limited", "limit": "5 per 1 minute", "route": "/submit", "duration_ms": 0.6, "cpu_ms": 2.4, "input_chars": 42, "input_english_words": 10, "input_sha256": "92fd20791c196c7c"}
+{"timestamp": "2026-11-05T02:19:30+00:00", "creator_id": "u9_m3_crashtest", "event": "rejected", "status": "rejected", "reason": "internal_error", "error": "RuntimeError: simulated model crash", "route": "/submit", "duration_ms": 1.0, "cpu_ms": 0.8, "input_chars": 49, "input_english_words": 9, "input_sha256": "ac1e3b491b2d79fd"}
+```
+
+---
+
+## What It Costs
+
+**The cost of one run is compute time** — nothing here calls a paid API.
+
+| One `/submit` | Wall time (mean of 10) | CPU time (mean of 10) |
+|---|---|---|
+| **Typical** — my ten real pieces, ~20 words each | **76 ms** (66–97) | **0.27 CPU-s** (0.25–0.36) |
+| **Worst case** — text past the 400-token limit the model reads | **752 ms** (686–871) | **2.79 CPU-s** (2.60–3.18) |
+| Once per start — loading the model | 8.7 s | — |
+
+**How I measured it:** I started the service with the documented gunicorn
+command, sent one warm-up submission so the model load wasn't counted, then
+sent ten submissions of each kind, one at a time, each under its own
+`creator_id`. The numbers are the `duration_ms` and `cpu_ms` the service
+logged for those twenty decisions — measured inside the service, so network
+and curl overhead aren't in them. Machine: Intel Core i5-8259U (4 cores,
+8 threads), 8 GB RAM, Python 3.12, torch 2.2.2 on CPU. Length is what drives
+it: the model reads up to 400 tokens, so a ~20-word piece costs about a tenth
+of a full one.
+
 <!-- ═════════════════════════════════════════════════════════════════════
 
      SUBMISSION CHECKLIST — unit 7
