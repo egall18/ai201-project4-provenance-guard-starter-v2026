@@ -462,6 +462,36 @@ $ curl -X POST http://127.0.0.1:5000/submit \
   out and re-run it fresh in order, so the log and results show the
   milestones in the order they happened.
 
+**Moment 5 — cutting the scope (unit 9, Milestone 1)**
+
+- *What I asked for:* Following the brief, I gave Claude my plan — refuse
+  non-English and non-text submissions — and asked it to break the plan into
+  the separate pieces of work it contained and count them, without judging
+  whether it was achievable.
+- *What came back:* Two pieces of new work (count real words; detect
+  non-Latin script with its own message), plus one that already existed
+  (logging refusals).
+- *What I changed:* I cut the script detector. Counting only A–Z words
+  already refuses Arabic, so the second piece bought only a different
+  message. That's in *The Shape* as out of scope.
+
+**Moment 6 — the sentence that failed my own gate (unit 9, Milestone 5)**
+
+- *What I asked for:* I wrote five short sentences for criterion 2 and gave
+  them to Claude to add to the test.
+- *What came back:* Before saving them, Claude counted them the way my gate
+  counts and told me "i worked 8 hours today" was only four words to it —
+  `8` isn't letters — so my own extension would refuse my own writing, and
+  that four of the five ran longer than the 5–7 words my criterion
+  described.
+- *What I changed:* Nothing in the sentences. I chose to use all five
+  exactly as I wrote them, because changing sentence 5 once I knew it would
+  fail would have been steering the test. It failed, and it became my
+  diagnosis and my fix. Claude also wrote the test harness
+  (`run_capstone.py`) and the code changes; I chose the shape, the scope,
+  every criterion's target, and the fix, each time from options it
+  predicted before any code changed.
+
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---
@@ -1587,6 +1617,28 @@ and curl overhead aren't in them. Machine: Intel Core i5-8259U (4 cores,
 it: the model reads up to 400 tokens, so a ~20-word piece costs about a tenth
 of a full one.
 
+**For a hundred people a day.** Say each person submits a piece and revises
+it twice — 3 submissions each, well inside the 50-a-day limit:
+
+```
+100 people × 3 submissions                      =    300 runs a day
+
+CPU, typical  (0.274 CPU-s each, measured)      300 × 0.274 =    82 CPU-seconds a day  ≈ 1.4 CPU-minutes
+CPU, worst    (2.787 CPU-s each, 400 tokens)    300 × 2.787 =   836 CPU-seconds a day  ≈ 14 CPU-minutes
+Busy time, worst case (0.752 s wall each)       300 × 0.752 =   226 s a day, out of 86,400  ≈ 0.26% of the day
+```
+
+So the compute is close to nothing — even if every submission were as long
+as the model can read, one worker would be idle 99.7% of the day. **The real
+cost is memory, held all day:** I measured the gunicorn worker at 30 MB
+before the first request and **758 MB once the model is loaded**, and it
+stays loaded. That's the number that rules out the 512 MB free tier, and
+it's the thing you'd pay for: a machine with at least 1 GB of RAM, on all
+day, for 300 requests that need under 4 minutes of its time. Every restart
+also costs one ~9-second model load before the first answer.
+
+---
+
 ## Run Log — Before
 
 `python run_capstone.py --label before` against the service started with the
@@ -1999,6 +2051,29 @@ prediction said they wouldn't, and they didn't.
   and PyTorch's CPU time inflates when cores are contended, so my best
   explanation is other work on the machine — but I didn't control for it.
   Still met; the margin went from ~85 ms to ~37 ms.
+
+---
+
+## What's Still Broken (unit 9)
+
+**Criteria still missed:** none after the fix — all five met in all three
+after-trials. What I'd still count against the work:
+
+| What's left | What I'd do | Why I stopped |
+|---|---|---|
+| **MF03 gets through now.** My fix made terminal colour codes (`\x1b[31m`) count as words, so unit 8's MF03 is scored (`unsure`, 0.42) instead of refused. | Strip control and escape sequences before counting words. | It's a second change, and the milestone allows one. My own criteria didn't cover it, so it's the first thing a new criterion should. |
+| **Criterion 5's margin shrank from ~85 ms to ~37 ms, and I can't fully explain it.** The fix costs 0.08 ms; the load average was 6.3. | Re-measure on a quiet machine, record the load average with every trial, and report the spread, not just the mean. | Ran out of room in the unit to set up a controlled run, and re-running until it looked better would be choosing results. |
+| **Criterion 2 had only one short sentence with a number in it.** The fix passed a set that barely tests it. | Add a batch of short real sentences with times, prices and counts. | The criteria were committed before results; adding inputs now would change the test after seeing the answer. |
+| **Non-English writing is refused, not scored.** | Nothing this unit — it's out of scope by decision (*The Shape*). An honest refusal beats a made-up score from an English-only model. | Deliberate. |
+| **Unit 8's signal-one evasions are still live** (PI02, EV01, PI01, EV08). | See below — it's the first thing I'd do. | Out of scope by decision; a signal change moves every score. |
+
+**What I'd do next, with another unit:** I'd change signal one to score
+perplexity sentence by sentence and take the median, so a short burst of
+strange text — like PI02's fake `SYSTEM:` line — can't drag a whole AI
+essay down to "human". That one first because it's still my worst outcome
+from unit 8: it clears someone who typed a fake instruction while an honest
+non-native writer gets "we couldn't tell", and none of this unit's hardening
+touches it.
 
 ---
 
