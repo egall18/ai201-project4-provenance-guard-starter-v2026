@@ -85,7 +85,10 @@ AGREEMENT_FLOOR = 0.5
 # that decide who pays for it.
 
 HUMAN_THRESHOLD = 0.35
-AI_THRESHOLD = 0.65
+# Unit 8, Milestone 5: lowered from 0.65. Three evasions (EV07, EV09, PI03)
+# had BOTH signals above 0.5 but averaged 0.616–0.623, just under the old
+# line. The agreement-rule cap follows this down to 0.59.
+AI_THRESHOLD = 0.60
 
 # ⚠️ One thing that catches people out in Milestone 5. A weighted average can
 # only land between its two inputs — so while `style_signal` is still the stub
