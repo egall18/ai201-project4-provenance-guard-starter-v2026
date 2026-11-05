@@ -232,6 +232,58 @@ system doesn't fit its host *before* you spend an evening watching it get
 killed is the skill unit 9 is actually testing. Write the arithmetic above in
 your write-up; that's the deliverable.
 
+### Path B — how this runs (unit 9)
+
+**What the environment needs**
+
+| | |
+|---|---|
+| Python | **3.12** (3.11 also fine). Not 3.13 on an Intel Mac — PyTorch stopped shipping Intel-Mac builds at 2.2.2, which supports up to 3.12. Not 3.14 anywhere |
+| Packages | `requirements.txt` — flask 3.1, flask-limiter 3.12, transformers 4.57, torch 2.2.2 (Intel Mac) or newer, gunicorn 23, requests, certifi |
+| Model | `gpt2`, downloaded once by `python detector.py` into `~/.cache/huggingface` — **about 525 MB on disk** |
+| Disk / memory | ~9 GB free for torch + model; the running service holds the model in memory |
+| Port | 5000. On macOS, AirPlay Receiver also listens on 5000 — turn it off, or use `--bind 127.0.0.1:5001` and point curl there |
+
+**Set up once, from a clean checkout**
+
+```bash
+git clone https://github.com/egall18/ai201-project4-provenance-guard-starter-v2026.git
+cd ai201-project4-provenance-guard-starter-v2026
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+python test.py          # should end "0 failed"
+python detector.py      # downloads the model the first time
+```
+
+**The one command that starts it**
+
+```bash
+gunicorn app:app --bind 127.0.0.1:5000 --workers 1 --timeout 120
+```
+
+One worker on purpose: the rate limiter keeps its counts in that worker's
+memory, and a second worker would keep a second set of counts and let every
+caller through twice as often. The long timeout covers the first request,
+which loads the model (10–20 s).
+
+**Check it's up, then leave a record**
+
+```bash
+curl http://127.0.0.1:5000/health
+curl -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" \
+  -d '{"text": "Some writing of at least five English words.", "creator_id": "me"}'
+curl "http://127.0.0.1:5000/log?limit=10"
+```
+
+Every request writes one JSON line to `logs/audit.jsonl` — decisions,
+appeals, refusals, rate limits and crashes alike — with `timestamp`,
+`route`, `duration_ms`, `cpu_ms`, what came in (`input_chars`,
+`input_english_words`, a 16-character `input_sha256` fingerprint — never the
+text itself) and what came out (`guess`, scores, `label`, or the refusal
+`reason`). `logs/audit.jsonl` is committed: it is the run record.
+
 ---
 
 ## Where everything lives

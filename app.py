@@ -25,9 +25,12 @@ Routes:
 """
 
 import re
+import hashlib
+import time
 import uuid
 
-from flask import Flask, jsonify, request
+from flask import Flask, g, jsonify, request
+from werkzeug.exceptions import HTTPException
 
 import audit
 import config
@@ -36,6 +39,56 @@ import scoring
 import stylometry
 
 app = Flask(__name__)
+
+
+# ── Instrumentation — UNIT 9 ─────────────────────────────────────────────────
+# Every log record carries how long the request took and what came in, so a
+# run can be read back without the code. The text itself is NOT logged — it's
+# people's own writing — only its size and a fingerprint that matches it to a
+# known input.
+
+@app.before_request
+def _start_clock():
+    g.t0 = time.perf_counter()
+    g.cpu0 = time.process_time()
+
+
+def run_fields():
+    """Duration, compute time and a description of the input, for the log."""
+    fields = {
+        "route": request.path,
+        "duration_ms": round((time.perf_counter() - g.t0) * 1000, 1),
+        "cpu_ms": round((time.process_time() - g.cpu0) * 1000, 1),
+    }
+    payload = request.get_json(silent=True)
+    text = payload.get("text") if isinstance(payload, dict) else None
+    if isinstance(text, str):
+        fields["input_chars"] = len(text)
+        fields["input_english_words"] = len(english_words(text))
+        fields["input_sha256"] = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+    else:
+        fields["input_type"] = type(text).__name__ if payload is not None else "unparseable"
+    return fields
+
+
+@app.errorhandler(Exception)
+def _unexpected(exc):
+    """
+    A crash still leaves a record. HTTP errors (404, 405, 429…) pass through
+    to their normal handling; anything else is a bug, logged as a 500.
+    """
+    if isinstance(exc, HTTPException):
+        return exc
+    payload = request.get_json(silent=True)
+    creator = payload.get("creator_id") if isinstance(payload, dict) else None
+    audit.log_rejection(
+        creator_id=creator if isinstance(creator, str) else "unknown",
+        reason="internal_error",
+        error=f"{type(exc).__name__}: {exc}"[:200],
+        **run_fields(),
+    )
+    return jsonify({"error": "internal_error",
+                    "message": "Something went wrong on our side. It has been logged."}), 500
 
 
 # ── Rate limiting — UNIT 8 ────────────────────────────────────────────────────
@@ -111,6 +164,7 @@ if config.RATE_LIMITING_ENABLED:
             creator_id=payload.get("creator_id", "unknown"),
             reason="rate_limited",
             limit=str(exc.description),
+            **run_fields(),
         )
         return jsonify({
             "error": "rate_limited",
@@ -237,7 +291,7 @@ def submit():
     try:
         model_score = detector.model_signal(text)
     except detector.DetectorUnavailable as exc:
-        audit.log_rejection(creator_id=creator_id, reason="detector_unavailable")
+        audit.log_rejection(creator_id=creator_id, reason="detector_unavailable", **run_fields())
         return jsonify({"error": "detector_unavailable", "message": str(exc)}), 503
 
     # ── Signal two, then the combining rule ──
@@ -260,6 +314,7 @@ def submit():
         label=label,
         capped=capped,
         thresholds=[config.HUMAN_THRESHOLD, config.AI_THRESHOLD],
+        **run_fields(),
     )
 
     return jsonify({
@@ -286,7 +341,7 @@ def english_words(text):
 
 def _reject(creator_id, reason, message):
     """Refuse a malformed submission: log it, then answer 400."""
-    audit.log_rejection(creator_id=creator_id, reason=reason)
+    audit.log_rejection(creator_id=creator_id, reason=reason, **run_fields())
     return jsonify({"error": "invalid_input", "reason": reason, "message": message}), 400
 
 
@@ -329,7 +384,7 @@ def appeal():
     if decision is None:
         audit.log_rejection(
             creator_id="unknown", reason="appeal_not_found",
-            requested_content_id=content_id,
+            requested_content_id=content_id, **run_fields(),
         )
         return jsonify({
             "error": "not_found",
@@ -339,7 +394,7 @@ def appeal():
     if any(e.get("event") == "appeal" for e in history):
         audit.log_rejection(
             creator_id=decision["creator_id"], reason="appeal_already_under_review",
-            requested_content_id=content_id,
+            requested_content_id=content_id, **run_fields(),
         )
         return jsonify({
             "error": "already_under_review",
@@ -350,6 +405,7 @@ def appeal():
         content_id=content_id,
         creator_id=decision["creator_id"],
         reasoning=reasoning.strip(),
+        **run_fields(),
     )
     return jsonify({
         "content_id": content_id,
