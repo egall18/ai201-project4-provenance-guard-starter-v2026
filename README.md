@@ -1441,6 +1441,43 @@ text that got through unlabelled: three more evasions in this set, a cost
 spread thinly across many people instead of landing hard on one.
 
 
+<!-- ═══════════════════════ UNIT 9 — THE EXTENSION ═══════════════════════ -->
+
+---
+
+## The Shape
+
+**The system:** Provenance Guard — this repository, as submitted at the end
+of unit 8.
+
+**The shape: B — harden against failure.** I'm adding one hardening layer
+at the route: `/submit` will count real English words — runs of the letters
+A–Z — instead of whitespace-separated chunks, and refuse anything with fewer
+than five with a 400 that tells the writer why: the service can only check
+English text. Today the route counts `text.split()`, so text neither signal
+can read gets through and gets a label. Unit 8 showed both ways it goes
+wrong: `!!! ??? ... ,,, ;;; --- ((( )))` was labelled "We think this was
+probably written by a person" (MF04), and a sentence in Arabic got a model
+score of 0.906 from an English-only model (MF07). The refusal is logged
+through the same path as every other bad input, so it leaves a record.
+
+**Out of scope:**
+
+- **Other languages.** I'm not adding a multilingual model or scoring
+  non-English text. Non-English writing gets an honest refusal, not a score.
+- **Signal one.** I'm not changing how perplexity is computed — no
+  per-sentence median. PI02, EV01 and the other rare-token evasions from
+  unit 8 stay broken; changing a signal moves every score in every set, and
+  that's a different unit's work.
+- **A second check for script.** I planned a separate non-Latin-script
+  detector with its own message, then cut it: counting only A–Z words
+  already refuses Arabic (it has none), so two checks were one piece of work
+  too many. The cost is one message for "not English" and "no words" alike.
+
+**Size check:** one rule in one function, plus its message — well under the
+90-minute limit. The run path, structured logging and cost measurement are
+required in every shape and come in Milestone 3.
+
 <!-- ═════════════════════════════════════════════════════════════════════
 
      SUBMISSION CHECKLIST — unit 7
