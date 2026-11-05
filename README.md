@@ -42,7 +42,7 @@
 1. **The request arrives.** A writer sends `POST /submit` with
    `{"text": ..., "creator_id": ...}`. Flask hands the JSON to
    `app.py::submit`.
-2. **The route checks it.** Missing, blank, too-short (under 5 words) or
+2. **The route checks it.** Missing, blank, too-short (under 5 English words — see unit 9) or
    too-long (over 20,000 characters) text is refused with a `400` and logged
    as a rejection. Anything that passes gets a fresh `content_id` (a uuid).
 3. **Signal one — `detector.model_signal`.** GPT-2, running locally, reads the
@@ -85,7 +85,7 @@ reach "AI" on its own.** That's the case Milestone 4's weights and Milestone
 
 | In | Type | Rule |
 |---|---|---|
-| `text` | string | required; at least 5 words and at most 20,000 characters after trimming |
+| `text` | string | required; at least 5 English words (runs of A–Z — unit 9; before that, any whitespace-separated chunks) and at most 20,000 characters after trimming |
 | `creator_id` | string | required; not blank |
 
 | Out (`200`) | Type | Meaning |
@@ -1473,6 +1473,17 @@ through the same path as every other bad input, so it leaves a record.
   detector with its own message, then cut it: counting only A–Z words
   already refuses Arabic (it has none), so two checks were one piece of work
   too many. The cost is one message for "not English" and "no words" alike.
+
+**Built (Milestone 2):** `app.py::english_words` counts runs of A–Z letters
+(an apostrophe allowed inside, so *didn't* is one word); `app.py::submit`
+uses it for the five-word minimum and refuses with reason
+`too_few_english_words` and the message "text needs at least 5 words of
+English to judge. This service can only check English text." Punctuation,
+emoji and Arabic all count as zero words. I checked the original system
+still works before moving on: `/ping` answers, three submissions from unit 8
+came back with the same model, style and combined scores and the same labels,
+the appeal paths still return 200 / 409 / 404, and the old bad inputs still
+get 400.
 
 **Size check:** one rule in one function, plus its message — well under the
 90-minute limit. The run path, structured logging and cost measurement are
