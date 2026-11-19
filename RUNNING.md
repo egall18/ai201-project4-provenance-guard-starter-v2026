@@ -81,6 +81,132 @@ position.**
 
 ---
 
+## Run the finished service (try it yourself)
+
+In this repo `/submit` and `/appeal` are built, so you get real answers instead
+of a `501`. Follow these steps on a fresh clone to see it work from start to
+finish.
+
+### 1. Set up (once)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python test.py           # should pass
+python detector.py       # downloads the ~550 MB model once
+```
+
+### 2. Start the service (terminal 1)
+
+```bash
+source .venv/bin/activate
+PORT=5001 python app.py
+```
+
+Leave this terminal running. **Use port 5001 on a Mac**, because macOS AirPlay
+Receiver often takes port 5000 and curl then gets `403` or no answer. On other
+systems, plain `python app.py` on 5000 works too. Just change the port in the
+commands below to match.
+
+If the curls in step 3 print nothing, the service isn't running. Go back to
+terminal 1 and check for an error.
+
+### 3. Send it examples (terminal 2)
+
+**Check it's up:**
+
+```bash
+curl -s http://127.0.0.1:5001/health
+```
+
+Expect `"ok": true` and `"detector_loaded": true`.
+
+**A short human piece gets a label.** Expect HTTP 200 and `"guess": "human"`:
+
+```bash
+curl -s -X POST http://127.0.0.1:5001/submit -H "Content-Type: application/json" \
+  -d '{"text": "i worked 8 hours today", "creator_id": "demo"}'
+```
+
+```json
+{
+  "confidence": 0.2542,
+  "content_id": "8bfad595-...",
+  "guess": "human",
+  "label": "We think this was probably written by a person.",
+  "model_score": 0.0085,
+  "status": "decided",
+  "style_score": 0.5
+}
+```
+
+The first submit can take about 10 seconds while the model loads. After that
+it takes under a second.
+
+**Polished, AI-sounding text gets flagged.** Expect HTTP 200 and
+`"guess": "ai"`:
+
+```bash
+curl -s -X POST http://127.0.0.1:5001/submit -H "Content-Type: application/json" \
+  -d '{"text": "Furthermore, it is important to note that effective time management plays a crucial role in achieving both personal and professional goals. By prioritizing tasks and leveraging available resources, individuals can enhance productivity and foster a healthier work-life balance.", "creator_id": "demo"}'
+```
+
+```json
+{
+  "confidence": 0.7844,
+  "guess": "ai",
+  "label": "This looks like it was likely written with AI. Our checks can be wrong. If you wrote this yourself, you can ask a person to review it.",
+  "model_score": 0.8166,
+  "status": "decided",
+  "style_score": 0.7523
+}
+```
+
+**Punctuation only is refused, with a reason.** Expect HTTP 400 and
+`too_few_english_words`:
+
+```bash
+curl -s -X POST http://127.0.0.1:5001/submit -H "Content-Type: application/json" \
+  -d '{"text": "!!! ??? ... ,,, ;;; --- ((( )))", "creator_id": "demo"}'
+```
+
+```json
+{
+  "error": "invalid_input",
+  "message": "text needs at least 5 words, at least 3 of them English, to judge. This service can only check English text.",
+  "reason": "too_few_english_words"
+}
+```
+
+**Appeal a decision.** Copy a `content_id` from one of your submit responses.
+Expect HTTP 200 and `"status": "under_review"`:
+
+```bash
+curl -s -X POST http://127.0.0.1:5001/appeal -H "Content-Type: application/json" \
+  -d '{"content_id": "PASTE-CONTENT-ID-HERE", "reasoning": "I wrote this myself."}'
+```
+
+An unknown `content_id` returns HTTP 404 `not_found`.
+
+**See the audit log.** Every request above is recorded, refused ones included:
+
+```bash
+curl -s "http://127.0.0.1:5001/log?limit=3"
+```
+
+To see the status code as well as the body, add `-w "\nHTTP %{http_code}\n"` to
+any of these curls.
+
+> Running these examples adds lines to `logs/audit.jsonl`. If you don't want
+> to commit them, run `git checkout logs/audit.jsonl`.
+
+### 4. Stop it
+
+Press `Ctrl+C` in terminal 1.
+
+---
+
 ## The routes
 
 | Route | State | What it does |
